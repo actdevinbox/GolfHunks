@@ -188,6 +188,7 @@
 </head>
 <body>
 
+<!-- DB loading overlay -->
 <div id="loadingOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:9999;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
   <div style="font-size:2rem;">⛳</div>
@@ -195,15 +196,66 @@
   <div id="loadingError" style="display:none;font-family:var(--mono);font-size:.74rem;color:#e07070;max-width:340px;text-align:center;"></div>
 </div>
 
+<!-- First-run: no admin PIN set yet -->
+<div id="setupOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;">
+  <div style="font-size:2.4rem;">⛳</div>
+  <div style="font-family:var(--mono);font-size:1.1rem;color:var(--gold);letter-spacing:.06em;">First-Time Setup</div>
+  <div style="max-width:360px;text-align:center;font-family:var(--mono);font-size:.78rem;color:var(--text-muted);line-height:1.6;">
+    No admin PIN is set yet. Create one now — this PIN grants full admin access.
+    Keep it private. You can change it later in Admin → League Settings.
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px;">
+    <div class="form-row"><label>Admin PIN</label>
+      <input type="password" id="setupPin1" maxlength="4" placeholder="4 digits"
+        style="letter-spacing:.2em;font-size:1rem;" /></div>
+    <div class="form-row"><label>Confirm PIN</label>
+      <input type="password" id="setupPin2" maxlength="4" placeholder="4 digits"
+        style="letter-spacing:.2em;font-size:1rem;"
+        onkeydown="if(event.key==='Enter')saveAdminPinSetup()" /></div>
+    <div id="setupError" style="color:#e07070;font-family:var(--mono);font-size:.74rem;display:none;"></div>
+    <button class="btn" onclick="saveAdminPinSetup()">Set Admin PIN &amp; Enter</button>
+  </div>
+</div>
+
+<!-- Site gate: name + PIN login -->
+<div id="siteGate" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9997;
+  flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;">
+  <div style="font-size:2.4rem;">⛳</div>
+  <div style="font-family:var(--mono);font-size:1.1rem;color:var(--gold);letter-spacing:.06em;" id="gateLeagueName">Golf Fantasy League</div>
+  <div style="max-width:340px;width:100%;display:flex;flex-direction:column;gap:14px;">
+    <div class="form-row">
+      <label>Your Name</label>
+      <select id="gateNameSelect" style="font-size:.9rem;">
+        <option value="">— select your name —</option>
+        <option value="__admin__">Admin</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>PIN</label>
+      <input type="password" id="gatePinInput" maxlength="4" placeholder="4-digit PIN"
+        style="letter-spacing:.25em;font-size:1.1rem;"
+        onkeydown="if(event.key==='Enter')siteLogin()" />
+    </div>
+    <div id="gateError" style="color:#e07070;font-family:var(--mono);font-size:.74rem;display:none;"></div>
+    <button class="btn" style="width:100%;padding:12px;" onclick="siteLogin()">Enter</button>
+  </div>
+</div>
+
 <header>
   <h1>⛳ Golf Fantasy <span>League</span></h1>
   <nav class="nav-tabs">
     <button class="nav-tab active" onclick="showTab('standings')">Standings</button>
     <button class="nav-tab" onclick="showTab('leaderboard')">Current Week</button>
+    <button class="nav-tab" onclick="showTab('mypicks')">My Picks</button>
     <button class="nav-tab" onclick="showTab('history')">Week History</button>
     <button class="nav-tab" onclick="showTab('field')">Players</button>
-    <button class="nav-tab" onclick="showTab('admin')">Admin</button>
+    <button class="nav-tab" id="adminTabBtn" style="display:none;" onclick="showTab('admin')">Admin</button>
   </nav>
+  <div style="display:flex;align-items:center;gap:10px;padding:0 12px;">
+    <span style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted);" id="headerUserLabel"></span>
+    <button class="btn-ghost btn-sm" onclick="siteLogout()" style="font-size:.72rem;">Sign out</button>
+  </div>
 </header>
 
 <main>
@@ -244,6 +296,45 @@
       </div>
       <div id="pga-leaderboard"><div class="empty"><div class="empty-icon">📄</div>No scores loaded — upload a CSV in the Admin tab.</div></div>
     </div>
+  </div>
+
+  <!-- ══ MY PICKS TAB ══ -->
+  <div id="tab-mypicks" style="display:none;">
+
+    <!-- Identity card: shown when not signed in -->
+    <div class="card" id="picksLoginCard">
+      <div class="card-title">Enter Your Picks</div>
+      <p class="text-small text-muted" style="margin-bottom:14px;">Select your name and enter your PIN to view and submit your picks.</p>
+      <div class="grid-2" style="max-width:400px;">
+        <div class="form-row">
+          <label>Your Name</label>
+          <select id="picksLoginName">
+            <option value="">— select —</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>PIN</label>
+          <input type="password" id="picksLoginPin" maxlength="4" placeholder="4-digit PIN"
+            onkeydown="if(event.key==='Enter')competitorLogin()" style="letter-spacing:.2em;" />
+        </div>
+      </div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="competitorLogin()">Sign In</button>
+      </div>
+      <div id="picksLoginError" class="text-small" style="color:#e07070;margin-top:8px;display:none;"></div>
+    </div>
+
+    <!-- Picks entry card: shown when signed in -->
+    <div class="card" id="picksEntryCard" style="display:none;">
+      <div class="card-title">
+        <span id="picksEntryTitle">My Picks</span>
+        <button class="btn-ghost btn-sm" onclick="competitorLogout()">Sign out</button>
+      </div>
+      <div id="picksDeadlineBanner" style="font-family:var(--mono);font-size:.72rem;margin-bottom:14px;
+        padding:8px 12px;border-radius:4px;background:rgba(0,0,0,.2);border-left:3px solid var(--gold);"></div>
+      <div id="picksEntryBody"></div>
+    </div>
+
   </div>
 
   <!-- ══ STANDINGS TAB ══ -->
@@ -397,11 +488,50 @@
       </div>
     </div>
 
-    <!-- Manage Competitors -->
+    <!-- Manage Competitors & PINs -->
     <div class="card">
-      <div class="card-title">Manage Competitors</div>
-      <p class="text-small text-muted" style="margin-bottom:10px;">Remove test or unwanted competitors. Their unlocked picks are also removed. Locked history is preserved.</p>
+      <div class="card-title">Manage Competitors &amp; PINs</div>
+      <p class="text-small text-muted" style="margin-bottom:10px;">
+        Set a 4-digit PIN for each competitor. Share PINs privately. Competitors use their PIN to submit picks via the <strong>My Picks</strong> tab.
+        Remove test entries with ✕.
+      </p>
       <div id="competitorList"><div class="empty" style="padding:10px">No competitors loaded yet.</div></div>
+    </div>
+
+    <!-- Pick Deadline & Self-Entry -->
+    <div class="card">
+      <div class="card-title">Pick Deadline &amp; Self-Entry</div>
+      <p class="text-small text-muted" style="margin-bottom:12px;">
+        Set a deadline for competitor pick submissions (Central Time). After the deadline, the <strong>My Picks</strong> tab locks.
+        Toggle self-entry on/off independently of the deadline.
+      </p>
+      <div class="grid-2" style="max-width:480px;">
+        <div class="form-row">
+          <label>Pick Deadline (Central Time)</label>
+          <input type="datetime-local" id="pickDeadlineInput" />
+        </div>
+        <div class="form-row" style="display:flex;align-items:center;gap:10px;padding-top:22px;">
+          <input type="checkbox" id="picksOpenToggle" style="width:auto;" onchange="saveDeadlineSettings()" />
+          <label style="margin-bottom:0;">Self-entry open</label>
+        </div>
+      </div>
+      <div class="flex mt-16" style="gap:8px;align-items:center;">
+        <button class="btn" onclick="saveDeadlineSettings()">Save Deadline</button>
+        <span class="text-small text-muted" id="deadlineStatus"></span>
+      </div>
+    </div>
+
+    <!-- Submission Status -->
+    <div class="card">
+      <div class="card-title">Pick Submission Status</div>
+      <div id="submissionStatus"><div class="empty">No competitors yet.</div></div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="card">
+      <div class="card-title">Pick Change Audit Log</div>
+      <p class="text-small text-muted" style="margin-bottom:10px;">Every time a competitor submits or changes picks, it is recorded here.</p>
+      <div id="auditLogTable"><div class="empty">No changes logged yet.</div></div>
     </div>
 
     <!-- League Settings -->
@@ -413,6 +543,9 @@
         <div class="form-row"><label>Max Uses Per Golfer (Season)</label><input type="number" id="maxUses" min="1" max="10" /></div>
         <div class="form-row"><label>Best Score Prize ($)</label><input type="number" id="highPrize" /></div>
         <div class="form-row"><label>Worst Score Penalty ($)</label><input type="number" id="lowPenalty" /></div>
+        <div class="form-row"><label>Admin PIN</label>
+          <input type="password" id="adminPinInput" maxlength="4" placeholder="4 digits"
+            style="letter-spacing:.2em;max-width:120px;" /></div>
       </div>
       <button class="btn" onclick="saveSettings()">Save Settings</button>
     </div>
@@ -453,9 +586,13 @@
     <!-- Danger -->
     <div class="card">
       <div class="card-title">Danger Zone</div>
-      <div class="flex">
+      <div class="flex" style="margin-bottom:12px;">
         <button class="btn btn-danger btn-sm" onclick="resetSeason()">Reset Season Data</button>
-        <span class="text-small text-muted">Clears all picks, scores, locked history &amp; money. Keeps player roster &amp; player list.</span>
+        <span class="text-small text-muted">Clears picks, scores, locked history &amp; money. Keeps players, PINs &amp; player list.</span>
+      </div>
+      <div class="flex">
+        <button class="btn btn-danger btn-sm" onclick="fullReset()">Full Reset</button>
+        <span class="text-small text-muted">Wipes <strong>everything</strong> — players, PINs, admin PIN, all data. Returns to first-run setup. Use for testing only.</span>
       </div>
     </div>
   </div>
@@ -468,7 +605,7 @@
 'use strict';
 
 // ═══ STATE ═══════════════════════════════════════════════════════════════════
-const TABS = ['standings','leaderboard','history','field','admin'];
+const TABS = ['standings','leaderboard','mypicks','history','field','admin'];
 let state = defaultState();
 let pendingScoreCsv   = null;
 let pendingPicksCsv   = null;
@@ -484,20 +621,34 @@ function defaultState() {
       maxUses: 3,
       lowPenalty: 10,
       highPrize: 30,
+      adminPin: '',   // 4-digit admin PIN — set on first run
     },
-    players: [],
+    players: [],        // [{id, name, pin}]
     currentWeek: 1,
     currentTournName: '',
     picks: {},
     currentScores: null,
     lockedWeeks: {},
     playerList: [],
+    pickDeadline: null,   // ISO string (UTC) of when picks lock
+    picksOpen: false,     // admin toggle: allows competitor self-entry
+    auditLog: [],         // [{ts, competitorName, week, prev, next, changedBy}]
   };
 }
 
 function mergeState(remote) {
   const d = defaultState();
-  return { ...d, ...remote, settings: { ...d.settings, ...(remote.settings||{}) } };
+  return {
+    ...d, ...remote,
+    settings: { ...d.settings, ...(remote.settings||{}) },
+    auditLog: remote.auditLog || [],
+    picksOpen: remote.picksOpen || false,
+    pickDeadline: remote.pickDeadline || null,
+    // Ensure players always have pin field
+    players: (remote.players||[]).map(function(p) {
+      return { id: p.id, name: p.name, pin: p.pin || '' };
+    }),
+  };
 }
 
 // Debounced Firestore write — batches rapid successive saves into one write
@@ -527,17 +678,19 @@ async function initFirestore() {
     window._fsOnSnapshot(window._stateRef, function(snap) {
       if (!snap.exists()) return;
       const incoming = mergeState(snap.data());
-      // Only update if the incoming data differs (avoid re-render on our own writes)
       if (JSON.stringify(incoming) !== JSON.stringify(state)) {
         state = incoming;
-        renderAll();
+        if (_session) renderAll();
       }
     });
 
-    // Hide loading overlay and render
+    // Hide loading overlay — show setup or gate
     document.getElementById('loadingOverlay').style.display = 'none';
-    renderAll();
-    showTab('standings');
+    if (!state.settings.adminPin) {
+      document.getElementById('setupOverlay').style.display = 'flex';
+    } else {
+      showSiteGate();
+    }
   } catch(e) {
     document.getElementById('loadingError').textContent =
       'Could not connect to database: ' + e.message + '. Check your internet connection and Firestore rules.';
@@ -1791,19 +1944,35 @@ function renderCompetitorList() {
     el.innerHTML = '<div class="empty" style="padding:10px">No competitors loaded yet.</div>';
     return;
   }
-  let h = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>Competitor</th><th>PIN</th><th style="width:40px;"></th></tr></thead><tbody>';
   state.players.forEach(function(p) {
-    h += '<div style="display:inline-flex;align-items:center;gap:6px;' +
-         'background:rgba(0,0,0,.25);border:1px solid var(--card-border);' +
-         'border-radius:4px;padding:5px 10px;font-family:var(--mono);font-size:.76rem;">' +
-         escH(p.name) +
-         ' <button onclick="removeCompetitor(' + "'" + p.id + "'" + ')" ' +
-         'style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem;line-height:1;padding:0 2px;" ' +
-         'title="Remove">&#x2715;</button>' +
-         '</div>';
+    h += '<tr>' +
+      '<td style="font-family:var(--mono);font-size:.8rem;">' + escH(p.name) + '</td>' +
+      '<td><div style="display:flex;gap:6px;align-items:center;">' +
+        '<input type="text" id="pin_' + p.id + '" value="' + escH(p.pin||'') + '" maxlength="4" ' +
+          'placeholder="0000" style="width:70px;letter-spacing:.15em;font-size:.8rem;" />' +
+        '<button class="btn btn-sm" onclick="savePin(' + "'" + p.id + "'" + ')">Save</button>' +
+      '</div></td>' +
+      '<td><button onclick="removeCompetitor(' + "'" + p.id + "'" + ')" ' +
+        'style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem;" ' +
+        'title="Remove">&#x2715;</button></td>' +
+      '</tr>';
   });
-  h += '</div>';
+  h += '</tbody></table></div>';
   el.innerHTML = h;
+}
+
+function savePin(id) {
+  const inp = document.getElementById('pin_' + id);
+  if (!inp) return;
+  const pin = inp.value.trim();
+  if (pin && !/^\d{4}$/.test(pin)) { toast('PIN must be exactly 4 digits', 'warn'); return; }
+  const p = state.players.find(function(x) { return x.id === id; });
+  if (!p) return;
+  p.pin = pin || '';
+  saveState();
+  toast('PIN saved for ' + p.name, 'success');
 }
 
 function removeCompetitor(id) {
@@ -1875,6 +2044,13 @@ function saveSettings() {
   state.settings.maxUses    = +document.getElementById('maxUses').value;
   state.settings.lowPenalty = +document.getElementById('lowPenalty').value;
   state.settings.highPrize  = +document.getElementById('highPrize').value;
+  const newAdminPin = (document.getElementById('adminPinInput').value || '').trim();
+  if (newAdminPin) {
+    if (!/^\d{4}$/.test(newAdminPin)) { toast('Admin PIN must be exactly 4 digits', 'warn'); return; }
+    state.settings.adminPin = newAdminPin;
+    document.getElementById('adminPinInput').value = '';
+    toast('Admin PIN updated', 'success');
+  }
   saveState(); renderAll(); toast('Settings saved!', 'success');
 }
 
@@ -1882,7 +2058,25 @@ function resetSeason() {
   if (!confirm('Reset ALL season data? This cannot be undone.\n\nThis will clear picks, scores, locked weeks, and money history. Player roster and player list are kept.')) return;
   state.picks = {}; state.lockedWeeks = {};
   state.currentWeek = 1; state.currentScores = null; state.currentTournName = '';
+  state.auditLog = []; state.pickDeadline = null; state.picksOpen = false;
   saveState(); renderAll(); toast('Season reset.', 'warn');
+}
+
+function fullReset() {
+  if (!confirm('FULL RESET — this wipes everything including all players, PINs, the admin PIN, and all season data.\n\nThe app will return to the first-run setup screen.\n\nAre you sure?')) return;
+  if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
+  state = defaultState();
+  saveState();
+  // Sign out and return to first-run setup
+  _session = null;
+  _loggedInPlayerId = null;
+  const adminBtn = document.getElementById('adminTabBtn');
+  if (adminBtn) adminBtn.style.display = 'none';
+  document.getElementById('picksLoginCard').style.display = '';
+  document.getElementById('picksEntryCard').style.display = 'none';
+  document.getElementById('siteGate').style.display = 'none';
+  document.getElementById('setupOverlay').style.display = 'flex';
+  toast('Full reset complete.', 'warn');
 }
 
 function toggleLiveStandings() {
@@ -1894,6 +2088,485 @@ function toggleLiveStandings() {
   btn.textContent = open ? 'Show' : 'Hide';
 }
 
+
+
+// ═══ SESSION ══════════════════════════════════════════════════════════════════
+let _session = null;
+function isAdmin() { return !!(_session && _session.isAdmin); }
+
+// ═══ FIRST-RUN SETUP ══════════════════════════════════════════════════════════
+function saveAdminPinSetup() {
+  const p1 = (document.getElementById('setupPin1').value || '').trim();
+  const p2 = (document.getElementById('setupPin2').value || '').trim();
+  const err = document.getElementById('setupError');
+  err.style.display = 'none';
+  if (!/^\d{4}$/.test(p1)) { err.textContent = 'PIN must be exactly 4 digits.'; err.style.display=''; return; }
+  if (p1 !== p2)            { err.textContent = 'PINs do not match.';            err.style.display=''; return; }
+  state.settings.adminPin = p1;
+  saveState();
+  document.getElementById('setupOverlay').style.display = 'none';
+  showSiteGate();
+}
+
+// ═══ SITE GATE ════════════════════════════════════════════════════════════════
+function showSiteGate() {
+  const sel = document.getElementById('gateNameSelect');
+  sel.innerHTML = '<option value="">— select your name —</option><option value="__admin__">Admin</option>';
+  state.players.forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  const lbl = document.getElementById('gateLeagueName');
+  if (lbl) lbl.textContent = state.settings.leagueName || 'Golf Fantasy League';
+  document.getElementById('siteGate').style.display = 'flex';
+  document.getElementById('gatePinInput').value = '';
+  document.getElementById('gateError').style.display = 'none';
+  setTimeout(function() { document.getElementById('gatePinInput').focus(); }, 100);
+}
+
+function siteLogin() {
+  const selId = (document.getElementById('gateNameSelect').value || '').trim();
+  const pin   = (document.getElementById('gatePinInput').value  || '').trim();
+  const err   = document.getElementById('gateError');
+  err.style.display = 'none';
+  if (!selId) { err.textContent = 'Please select your name.'; err.style.display=''; return; }
+  if (!pin)   { err.textContent = 'Please enter your PIN.';   err.style.display=''; return; }
+
+  if (selId === '__admin__') {
+    if (pin !== state.settings.adminPin) { err.textContent = 'Incorrect PIN.'; err.style.display=''; return; }
+    _session = { id: '__admin__', name: 'Admin', isAdmin: true };
+    _loggedInPlayerId = null;
+    enterApp();
+    return;
+  }
+  const player = state.players.find(function(p) { return p.id === selId; });
+  if (!player)      { err.textContent = 'Competitor not found.';          err.style.display=''; return; }
+  if (!player.pin)  { err.textContent = 'No PIN set — contact the admin.'; err.style.display=''; return; }
+  if (pin !== player.pin) { err.textContent = 'Incorrect PIN.';           err.style.display=''; return; }
+
+  _session = { id: player.id, name: player.name, isAdmin: false };
+  _loggedInPlayerId = player.id;
+  enterApp();
+}
+
+function enterApp() {
+  document.getElementById('siteGate').style.display = 'none';
+  const adminBtn = document.getElementById('adminTabBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin() ? '' : 'none';
+  const lbl = document.getElementById('headerUserLabel');
+  if (lbl) lbl.textContent = _session.name + (_session.isAdmin ? ' (admin)' : '');
+  if (_loggedInPlayerId) {
+    document.getElementById('picksLoginCard').style.display = 'none';
+    document.getElementById('picksEntryCard').style.display = '';
+  }
+  renderAll();
+  showTab('standings');
+}
+
+function siteLogout() {
+  _session = null;
+  _loggedInPlayerId = null;
+  const adminBtn = document.getElementById('adminTabBtn');
+  if (adminBtn) adminBtn.style.display = 'none';
+  document.getElementById('picksLoginCard').style.display = '';
+  document.getElementById('picksEntryCard').style.display = 'none';
+  showSiteGate();
+}
+
+// ═══ TIMEZONE HELPERS (Central Time) ══════════════════════════════════════════
+const CT_OFFSET_STD = -6; // CST
+const CT_OFFSET_DST = -5; // CDT
+
+function isCDT(date) {
+  // DST: second Sunday March → first Sunday November
+  const yr = date.getUTCFullYear();
+  const start = new Date(Date.UTC(yr, 2, 8 - new Date(Date.UTC(yr,2,1)).getUTCDay()));
+  const end   = new Date(Date.UTC(yr,10, 1 - new Date(Date.UTC(yr,10,1)).getUTCDay()));
+  return date >= start && date < end;
+}
+
+function utcToCT(date) {
+  const off = isCDT(date) ? CT_OFFSET_DST : CT_OFFSET_STD;
+  return new Date(date.getTime() + off * 3600000);
+}
+
+function ctLocalToUTC(localIso) {
+  // localIso is from datetime-local input, treat as CT
+  const d = new Date(localIso + ':00Z');
+  const guessOff = isCDT(d) ? CT_OFFSET_DST : CT_OFFSET_STD;
+  return new Date(d.getTime() - guessOff * 3600000);
+}
+
+function fmtCT(utcDate) {
+  const ct = utcToCT(utcDate);
+  return ct.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) +
+    ' ' + ct.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short',
+      timeZone: isCDT(utcDate) ? 'America/Chicago' : 'America/Chicago' });
+}
+
+function deadlineUtc() {
+  if (!state.pickDeadline) return null;
+  return new Date(state.pickDeadline);
+}
+
+function picksAreLocked() {
+  if (!state.picksOpen) return true;
+  const dl = deadlineUtc();
+  if (!dl) return false;
+  return Date.now() > dl.getTime();
+}
+
+// ═══ DEADLINE ADMIN ════════════════════════════════════════════════════════════
+function saveDeadlineSettings() {
+  const inp = document.getElementById('pickDeadlineInput');
+  const toggle = document.getElementById('picksOpenToggle');
+  if (!inp || !toggle) return;
+  const val = inp.value; // "YYYY-MM-DDTHH:MM" in CT
+  state.pickDeadline = val ? ctLocalToUTC(val).toISOString() : null;
+  state.picksOpen = toggle.checked;
+  saveState();
+  renderDeadlineStatus();
+  toast('Deadline settings saved', 'success');
+}
+
+function renderDeadlineStatus() {
+  const inp = document.getElementById('pickDeadlineInput');
+  const toggle = document.getElementById('picksOpenToggle');
+  const statusEl = document.getElementById('deadlineStatus');
+  if (!inp || !toggle || !statusEl) return;
+
+  // Populate input from state (convert UTC → CT local string for datetime-local)
+  if (state.pickDeadline) {
+    const utc = new Date(state.pickDeadline);
+    const ct = utcToCT(utc);
+    const pad = function(n) { return String(n).padStart(2,'0'); };
+    inp.value = ct.getFullYear() + '-' + pad(ct.getMonth()+1) + '-' + pad(ct.getDate()) +
+      'T' + pad(ct.getHours()) + ':' + pad(ct.getMinutes());
+  } else {
+    inp.value = '';
+  }
+  toggle.checked = !!state.picksOpen;
+
+  const dl = deadlineUtc();
+  if (!state.picksOpen) {
+    statusEl.textContent = 'Self-entry is OFF';
+  } else if (!dl) {
+    statusEl.textContent = 'Open — no deadline set';
+  } else if (Date.now() > dl.getTime()) {
+    statusEl.textContent = 'LOCKED — deadline passed ' + fmtCT(dl);
+  } else {
+    const mins = Math.round((dl.getTime() - Date.now()) / 60000);
+    const hrs  = Math.floor(mins / 60);
+    const rem  = hrs > 0 ? hrs + 'h ' + (mins%60) + 'm remaining' : mins + 'm remaining';
+    statusEl.textContent = 'Open until ' + fmtCT(dl) + ' (' + rem + ')';
+  }
+}
+
+// ═══ SUBMISSION STATUS (admin view) ════════════════════════════════════════════
+function renderSubmissionStatus() {
+  const el = document.getElementById('submissionStatus');
+  if (!el) return;
+  if (!state.players.length) { el.innerHTML = '<div class="empty">No competitors yet.</div>'; return; }
+
+  const wk = state.currentWeek;
+  const wkPicks = state.picks[wk] || {};
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>Competitor</th><th>Status</th><th>Picks</th><th class="r">Last Changed</th></tr></thead><tbody>';
+
+  state.players.forEach(function(p) {
+    const myPicks = wkPicks[p.id] || [];
+    const hasPin = !!(p.pin && p.pin.length === 4);
+    // Find most recent audit entry for this player this week
+    const lastEntry = [...(state.auditLog||[])].reverse().find(function(e) {
+      return e.playerId === p.id && e.week === wk;
+    });
+    const submitted = myPicks.length > 0;
+    const statusColor = submitted ? '#5dcc7a' : '#e07070';
+    const statusText = submitted ? '✓ Submitted' : '✗ No picks';
+    const pickStr = myPicks.map(function(g) { return fmtName(g); }).join(', ') || '—';
+    const lastTs = lastEntry ? new Date(lastEntry.ts).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' CT' : '—';
+
+    h += '<tr>' +
+      '<td style="font-family:var(--mono);font-size:.8rem;">' + escH(p.name) +
+        (hasPin ? '' : ' <span class="tag tag-gold" style="font-size:.55rem;">NO PIN</span>') + '</td>' +
+      '<td style="color:' + statusColor + ';font-family:var(--mono);font-size:.78rem;">' + statusText + '</td>' +
+      '<td class="text-small text-muted">' + escH(pickStr) + '</td>' +
+      '<td class="r text-small text-muted" style="font-family:var(--mono)">' + lastTs + '</td>' +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+}
+
+// ═══ AUDIT LOG ══════════════════════════════════════════════════════════════════
+function logPickChange(playerId, playerName, week, prevPicks, newPicks) {
+  if (!state.auditLog) state.auditLog = [];
+  state.auditLog.push({
+    ts: new Date().toISOString(),
+    playerId: playerId,
+    competitorName: playerName,
+    week: week,
+    prev: prevPicks || [],
+    next: newPicks,
+  });
+  // Keep last 500 entries
+  if (state.auditLog.length > 500) state.auditLog = state.auditLog.slice(-500);
+}
+
+function renderAuditLog() {
+  const el = document.getElementById('auditLogTable');
+  if (!el) return;
+  const log = (state.auditLog || []).slice().reverse();
+  if (!log.length) { el.innerHTML = '<div class="empty">No changes logged yet.</div>'; return; }
+
+  let h = '<div style="overflow-x:auto;max-height:340px;overflow-y:auto">' +
+    '<table class="data-table"><thead><tr>' +
+    '<th>Time (CT)</th><th>Competitor</th><th>Wk</th><th>Previous Picks</th><th>New Picks</th>' +
+    '</tr></thead><tbody>';
+
+  log.forEach(function(e) {
+    const ts = new Date(e.ts).toLocaleString('en-US',{
+      timeZone:'America/Chicago', month:'short', day:'numeric',
+      hour:'numeric', minute:'2-digit'}) + ' CT';
+    const prev = (e.prev||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
+    const next = (e.next||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
+    const changed = JSON.stringify(e.prev||[]) !== JSON.stringify(e.next||[]);
+    h += '<tr' + (changed ? '' : ' style="opacity:.5"') + '>' +
+      '<td class="text-small" style="font-family:var(--mono);white-space:nowrap;">' + ts + '</td>' +
+      '<td class="text-small">' + escH(e.competitorName||'') + '</td>' +
+      '<td class="text-small r">' + e.week + '</td>' +
+      '<td class="text-small text-muted">' + escH(prev) + '</td>' +
+      '<td class="text-small">' + escH(next) + '</td>' +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+}
+
+// ═══ COMPETITOR LOGIN / LOGOUT ══════════════════════════════════════════════════
+let _loggedInPlayerId = null;
+
+function competitorLogin() {
+  const nameEl = document.getElementById('picksLoginName');
+  const pinEl  = document.getElementById('picksLoginPin');
+  const errEl  = document.getElementById('picksLoginError');
+  const selId  = nameEl ? nameEl.value : '';
+  const pin    = pinEl  ? pinEl.value.trim() : '';
+
+  errEl.style.display = 'none';
+
+  if (!selId) { errEl.textContent = 'Please select your name.'; errEl.style.display=''; return; }
+  const player = state.players.find(function(p) { return p.id === selId; });
+  if (!player) { errEl.textContent = 'Competitor not found.'; errEl.style.display=''; return; }
+  if (!player.pin) { errEl.textContent = 'No PIN set for your account — contact the admin.'; errEl.style.display=''; return; }
+  if (pin !== player.pin) { errEl.textContent = 'Incorrect PIN.'; errEl.style.display=''; return; }
+
+  _loggedInPlayerId = selId;
+  document.getElementById('picksLoginCard').style.display = 'none';
+  document.getElementById('picksEntryCard').style.display = '';
+  renderPicksEntry();
+}
+
+function competitorLogout() {
+  _loggedInPlayerId = null;
+  document.getElementById('picksLoginCard').style.display = '';
+  document.getElementById('picksEntryCard').style.display = 'none';
+  if (document.getElementById('picksLoginPin')) document.getElementById('picksLoginPin').value = '';
+}
+
+// ═══ PICK ENTRY UI (competitor self-service) ════════════════════════════════════
+function renderPicksLoginDropdown() {
+  const sel = document.getElementById('picksLoginName');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select —</option>';
+  state.players.forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+}
+
+function renderPicksEntry() {
+  const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (!player) { competitorLogout(); return; }
+
+  document.getElementById('picksEntryTitle').textContent = player.name + ' — Week ' + state.currentWeek + ' Picks';
+
+  // Deadline banner
+  const banner = document.getElementById('picksDeadlineBanner');
+  const locked = picksAreLocked();
+  const dl = deadlineUtc();
+  if (!state.picksOpen) {
+    banner.style.borderLeftColor = '#e07070';
+    banner.innerHTML = '🔒 Pick submission is currently closed. Contact the admin.';
+  } else if (locked) {
+    banner.style.borderLeftColor = '#e07070';
+    banner.innerHTML = '🔒 Pick deadline has passed — ' + (dl ? fmtCT(dl) : '') + '. Your picks are locked.';
+  } else if (dl) {
+    const mins = Math.round((dl.getTime() - Date.now()) / 60000);
+    const hrs  = Math.floor(mins/60);
+    const rem  = hrs > 0 ? hrs + 'h ' + (mins%60) + 'm' : mins + 'm';
+    banner.style.borderLeftColor = 'var(--gold)';
+    banner.innerHTML = '⏰ Deadline: ' + fmtCT(dl) + ' — <strong>' + rem + ' remaining</strong>';
+  } else {
+    banner.style.borderLeftColor = 'var(--green-light)';
+    banner.innerHTML = '✓ Picks are open. Submit before the deadline.';
+  }
+
+  const wk = state.currentWeek;
+  const existing = (state.picks[wk] || {})[player.id] || [];
+  const body = document.getElementById('picksEntryBody');
+
+  if (locked) {
+    // Read-only view of their picks
+    let h = '<p class="text-small text-muted" style="margin-bottom:10px;">Your submitted picks for Week ' + wk + ':</p>';
+    if (existing.length) {
+      h += '<ol style="font-family:var(--mono);font-size:.82rem;line-height:2;">';
+      existing.forEach(function(g) { h += '<li>' + escH(fmtName(g)) + '</li>'; });
+      h += '</ol>';
+    } else {
+      h += '<div class="empty"><div class="empty-icon">🏌️</div>No picks submitted for this week.</div>';
+    }
+    body.innerHTML = h;
+    return;
+  }
+
+  // Check max uses per golfer (show usage counts)
+  const golferUsageByPlayer = {};
+  state.players.forEach(function(p2) {
+    golferUsageByPlayer[p2.id] = {};
+    Object.keys(state.lockedWeeks).forEach(function(lwk) {
+      const lw = state.lockedWeeks[lwk];
+      lw.results.forEach(function(r) {
+        if (r.playerId !== p2.id) return;
+        r.picks.forEach(function(g) {
+          var k = g.toLowerCase().trim();
+          golferUsageByPlayer[p2.id][k] = (golferUsageByPlayer[p2.id][k]||0)+1;
+        });
+      });
+    });
+  });
+  const myUsage = golferUsageByPlayer[player.id] || {};
+
+  // Build golfer options from playerList
+  const golferOptions = state.playerList.length
+    ? state.playerList.map(function(p) { return p.player_name; }).sort()
+    : [];
+
+  const dlId = 'golferDL';
+  let h = '<datalist id="' + dlId + '">';
+  golferOptions.forEach(function(n) {
+    var k = n.toLowerCase().trim();
+    var uses = myUsage[k] || 0;
+    if (uses < state.settings.maxUses) h += '<option value="' + escH(n) + '">';
+  });
+  h += '</datalist>';
+
+  h += '<p class="text-small text-muted" style="margin-bottom:12px;">Enter ' +
+    state.settings.maxUses + ' golfers. Max uses per golfer this season: <strong>' + state.settings.maxUses + '</strong>.</p>';
+
+  for (var i = 0; i < 5; i++) {
+    const val = existing[i] || '';
+    h += '<div class="form-row">' +
+      '<label>Golfer ' + (i+1) + '</label>' +
+      '<input type="text" class="pick-golfer-input" id="pickGolfer_' + i + '" ' +
+        'value="' + escH(val) + '" list="' + dlId + '" placeholder="Last, First" />' +
+      '</div>';
+  }
+
+  // Usage warning
+  h += '<div id="picksUsageWarning" style="display:none;margin-top:8px;"></div>';
+
+  h += '<div class="flex mt-16" style="gap:8px;">' +
+    '<button class="btn" onclick="submitCompetitorPicks()">Submit Picks</button>' +
+    '<button class="btn-ghost" onclick="renderPicksEntry()">Reset</button>' +
+    '</div>';
+  h += '<div id="picksSubmitMsg" style="margin-top:10px;font-family:var(--mono);font-size:.74rem;"></div>';
+
+  body.innerHTML = h;
+
+  // Wire up usage checking on input
+  document.querySelectorAll('.pick-golfer-input').forEach(function(inp) {
+    inp.addEventListener('input', checkPickUsage);
+  });
+}
+
+function checkPickUsage() {
+  const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (!player) return;
+  const golferUsageByPlayer = {};
+  golferUsageByPlayer[player.id] = {};
+  Object.keys(state.lockedWeeks).forEach(function(lwk) {
+    const lw = state.lockedWeeks[lwk];
+    lw.results.forEach(function(r) {
+      if (r.playerId !== player.id) return;
+      r.picks.forEach(function(g) {
+        var k = g.toLowerCase().trim();
+        golferUsageByPlayer[player.id][k] = (golferUsageByPlayer[player.id][k]||0)+1;
+      });
+    });
+  });
+  const myUsage = golferUsageByPlayer[player.id] || {};
+  const inputs = document.querySelectorAll('.pick-golfer-input');
+  const entered = [];
+  inputs.forEach(function(inp) { if (inp.value.trim()) entered.push(inp.value.trim().toLowerCase()); });
+
+  const warnings = [];
+  const seen = {};
+  entered.forEach(function(g) {
+    if (!g) return;
+    seen[g] = (seen[g]||0)+1;
+    if (seen[g] > 1) { warnings.push('"' + g + '" entered more than once this week'); return; }
+    const pastUses = myUsage[g] || 0;
+    if (pastUses >= state.settings.maxUses) warnings.push(fmtName(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
+    else if (pastUses === state.settings.maxUses - 1) warnings.push(fmtName(g) + ' — this would be your last allowed use');
+  });
+
+  const warnEl = document.getElementById('picksUsageWarning');
+  if (warnEl) {
+    if (warnings.length) {
+      warnEl.innerHTML = '<div class="alert alert-warn" style="padding:8px 12px;font-size:.74rem;">' +
+        warnings.map(function(w){ return '⚠ ' + escH(w); }).join('<br>') + '</div>';
+      warnEl.style.display = '';
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+}
+
+function submitCompetitorPicks() {
+  if (picksAreLocked()) { toast('Pick deadline has passed', 'error'); return; }
+  const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (!player) return;
+
+  const inputs = document.querySelectorAll('.pick-golfer-input');
+  const newPicks = [];
+  inputs.forEach(function(inp) { if (inp.value.trim()) newPicks.push(inp.value.trim()); });
+
+  if (newPicks.length !== 5) { toast('Please enter exactly 5 golfers', 'warn'); return; }
+
+  // Duplicate check
+  const lower = newPicks.map(function(g){ return g.toLowerCase(); });
+  const unique = new Set(lower);
+  if (unique.size !== lower.length) { toast('You have duplicate golfers', 'warn'); return; }
+
+  const wk = state.currentWeek;
+  const prev = ((state.picks[wk]||{})[player.id] || []).slice();
+
+  if (!state.picks[wk]) state.picks[wk] = {};
+  state.picks[wk][player.id] = newPicks;
+
+  logPickChange(player.id, player.name, wk, prev, newPicks);
+  saveState();
+
+  const msgEl = document.getElementById('picksSubmitMsg');
+  const ts = new Date().toLocaleString('en-US',{timeZone:'America/Chicago',
+    weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  if (msgEl) msgEl.innerHTML = '<span style="color:#5dcc7a;">✓ Picks saved at ' + ts + ' CT</span>';
+  toast('Picks submitted!', 'success');
+}
+
 // ═══ NAVIGATION ═══════════════════════════════════════════════════════════════
 function showTab(tab) {
   TABS.forEach(t => { document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none'; });
@@ -1901,7 +2574,18 @@ function showTab(tab) {
   if (tab === 'field')    renderFieldTable();
   if (tab === 'history')  renderWeekHistory();
   if (tab === 'standings') { renderLiveStandings(); renderCumulativeStandings(); }
-  if (tab === 'admin')     renderWinnerDebug();
+  if (tab === 'mypicks')  {
+    renderPicksLoginDropdown();
+    if (_loggedInPlayerId) {
+      document.getElementById('picksLoginCard').style.display = 'none';
+      document.getElementById('picksEntryCard').style.display = '';
+      renderPicksEntry();
+    } else {
+      document.getElementById('picksLoginCard').style.display = '';
+      document.getElementById('picksEntryCard').style.display = 'none';
+    }
+  }
+  if (tab === 'admin')    { renderWinnerDebug(); renderSubmissionStatus(); renderAuditLog(); renderDeadlineStatus(); }
 }
 
 function renderAll() {
@@ -1917,6 +2601,8 @@ function renderAll() {
   document.getElementById('maxUses').value     = s.maxUses;
   document.getElementById('lowPenalty').value  = s.lowPenalty;
   document.getElementById('highPrize').value   = s.highPrize;
+  const apEl = document.getElementById('adminPinInput');
+  if (apEl) apEl.placeholder = s.adminPin ? '••••  (set — enter new to change)' : '4 digits';
   ['lockWeekNum','lockWeekNum2'].forEach(id => document.getElementById(id).textContent = state.currentWeek);
 
   const parts = s.leagueName.split(' '), last = parts.pop();
@@ -1926,6 +2612,10 @@ function renderAll() {
   updateBanner();
   updateAdminWeekSelectors();
   renderCompetitorList();
+  renderPicksLoginDropdown();
+  renderDeadlineStatus();
+  renderSubmissionStatus();
+  renderAuditLog();
   renderLeaderboardTable();
   renderWeeklyFantasyScores();
   renderAdminWeekScores();
