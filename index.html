@@ -491,11 +491,26 @@
     <!-- Manage Competitors & PINs -->
     <div class="card">
       <div class="card-title">Manage Competitors &amp; PINs</div>
-      <p class="text-small text-muted" style="margin-bottom:10px;">
-        Set a 4-digit PIN for each competitor. Share PINs privately. Competitors use their PIN to submit picks via the <strong>My Picks</strong> tab.
-        Remove test entries with ✕.
+      <p class="text-small text-muted" style="margin-bottom:12px;">
+        Add competitors manually, set their 4-digit PIN, and share it with them privately.
+        Competitors use their name + PIN to enter the site via the login screen.
+        Remove entries with ✕.
       </p>
-      <div id="competitorList"><div class="empty" style="padding:10px">No competitors loaded yet.</div></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;
+        padding:12px 14px;background:rgba(0,0,0,.2);border-radius:6px;border-left:3px solid var(--green-light);">
+        <div class="form-row" style="margin-bottom:0;flex:1;min-width:160px;">
+          <label>Name</label>
+          <input type="text" id="newCompetitorName" placeholder="Full name" />
+        </div>
+        <div class="form-row" style="margin-bottom:0;width:100px;">
+          <label>PIN</label>
+          <input type="text" id="newCompetitorPin" maxlength="4" placeholder="0000"
+            style="letter-spacing:.15em;"
+            onkeydown="if(event.key==='Enter')addCompetitor()" />
+        </div>
+        <button class="btn" onclick="addCompetitor()" style="margin-bottom:1px;">Add</button>
+      </div>
+      <div id="competitorList"><div class="empty" style="padding:10px">No competitors yet — add one above.</div></div>
     </div>
 
     <!-- Pick Deadline & Self-Entry -->
@@ -1935,6 +1950,47 @@ function clearWinner(wk) {
   renderWinnerDebug();
   renderCumulativeStandings();
   toast('Winner cleared for Week ' + wk, 'warn');
+}
+
+function refreshGateDropdown() {
+  // Update the name dropdown on the site gate without showing it
+  const sel = document.getElementById('gateNameSelect');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— select your name —</option><option value="__admin__">Admin</option>';
+  state.players.forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  sel.value = current; // preserve selection if still valid
+}
+
+function addCompetitor() {
+  const nameEl = document.getElementById('newCompetitorName');
+  const pinEl  = document.getElementById('newCompetitorPin');
+  const name = (nameEl.value || '').trim();
+  const pin  = (pinEl.value  || '').trim();
+
+  if (!name) { toast('Enter a name', 'warn'); nameEl.focus(); return; }
+  if (pin && !/^\d{4}$/.test(pin)) { toast('PIN must be exactly 4 digits', 'warn'); pinEl.focus(); return; }
+
+  // Prevent duplicate names
+  const dupe = state.players.find(function(p) {
+    return p.name.toLowerCase() === name.toLowerCase();
+  });
+  if (dupe) { toast('"' + name + '" already exists', 'warn'); return; }
+
+  const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  state.players.push({ id: id, name: name, pin: pin || '' });
+  saveState();
+  renderCompetitorList();
+  refreshGateDropdown();
+  renderPicksLoginDropdown();
+  nameEl.value = '';
+  pinEl.value  = '';
+  nameEl.focus();
+  toast('Added ' + name + (pin ? ' with PIN' : ' — set a PIN before sharing'), pin ? 'success' : 'warn');
 }
 
 function renderCompetitorList() {
