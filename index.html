@@ -138,6 +138,8 @@
   .cum-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
   .cum-bar-bg{flex:1;background:rgba(42,74,53,.5);border-radius:3px;height:6px;overflow:hidden;}
   .cum-bar-fill{height:100%;border-radius:3px;transition:width .4s;}
+  .my-row{background:rgba(201,168,76,.07)!important;box-shadow:inset 3px 0 0 var(--gold);}
+  .my-col-header{background:rgba(201,168,76,.18)!important;color:var(--gold)!important;font-weight:700!important;}
 
   .flex{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
   .mt-16{margin-top:16px;}
@@ -1028,6 +1030,7 @@ function fmtName(raw) {
   return escH(raw);
 }
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function meId() { return (_session && !_session.isAdmin) ? _session.id : null; }
 
 let lbShowAll = false;
 function toggleLeaderboardExpand() {
@@ -1099,7 +1102,8 @@ function renderLeaderboardTable() {
   if (hasSG) h += '<th class="r hide-md">SG:Putt</th><th class="r hide-md">SG:App</th><th class="r hide-md">SG:OTT</th><th class="r hide-md">SG:Tot</th>';
   // Competitor columns — one per person with picks
   competitors.forEach(p => {
-    h += '<th class="c" title="' + escH(p.name) + '" style="min-width:32px">' + escH(initials(p.name)) + '</th>';
+    const isMe = p.id === meId();
+    h += '<th class="c' + (isMe ? ' my-col-header' : '') + '" title="' + escH(p.name) + '" style="min-width:32px' + (isMe ? ';font-weight:700' : '') + '">' + escH(initials(p.name)) + (isMe ? ' ◀' : '') + '</th>';
   });
   h += '</tr></thead><tbody>';
 
@@ -1296,9 +1300,10 @@ function renderWeeklyFantasyScores() {
       return '<span style="color:var(--text-muted)">' + fmtName(pd.name) + mc + nf + scoreStr + '</span>';
     }).join(', ');
 
-    h += '<tr>' +
+    const wfsMe = r.player.id === meId();
+    h += '<tr' + (wfsMe ? ' class="my-row"' : '') + '>' +
       '<td class="text-small ' + (i === 0 && r.total !== null ? 'rank-1' : 'text-muted') + '">' + (i+1) + '</td>' +
-      '<td>' + escH(r.player.name) + ' ' + badge + '</td>' +
+      '<td>' + (wfsMe ? '<strong>' : '') + escH(r.player.name) + (wfsMe ? '</strong>' : '') + ' ' + badge + '</td>' +
       '<td class="text-small">' + pickDisplay + '</td>' +
       '<td class="r ' + sc + '" style="font-family:var(--mono);font-weight:600">' + (r.total !== null ? fmtScore(r.total) : '—') + '</td>' +
       '<td class="r">' + money + '</td></tr>';
@@ -1437,9 +1442,10 @@ function renderLiveStandings() {
     const badge = liveWd ? (liveWd.isBest ? ' 🥇' : liveWd.isWorst ? ' 💸' : '') : '';
     const bal = r.balance;
 
-    h += '<tr>' +
+    const liveMe = r._id === meId();
+    h += '<tr' + (liveMe ? ' class="my-row"' : '') + '>' +
       '<td class="' + (i===0?'rank-1':'text-muted text-small') + '">' + (i+1) + '</td>' +
-      '<td><div>' + escH(r.name) + '</div>' +
+      '<td><div>' + (liveMe ? '<strong>' : '') + escH(r.name) + (liveMe ? '</strong>' : '') + '</div>' +
         '<div class="cum-bar-wrap" style="margin-top:3px"><div class="cum-bar-bg">' +
           '<div class="cum-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div>' +
         '</div></div></td>' +
@@ -1536,10 +1542,11 @@ function renderCumulativeStandings() {
     const barColor = r.total < 0 ? '#5dcc7a' : r.total > 0 ? '#e07070' : '#a0b8a8';
 
     const bal = r.balance;
-    h += '<tr>' +
+    const cumMe = r._id === meId();
+    h += '<tr' + (cumMe ? ' class="my-row"' : '') + '>' +
       '<td class="' + (i === 0 ? 'rank-1' : 'text-muted text-small') + '">' + (i+1) + '</td>' +
       '<td>' +
-        '<div>' + escH(r.name) + '</div>' +
+        '<div>' + (cumMe ? '<strong>' : '') + escH(r.name) + (cumMe ? '</strong>' : '') + '</div>' +
         '<div class="cum-bar-wrap" style="margin-top:4px;">' +
           '<div class="cum-bar-bg"><div class="cum-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
         '</div>' +
@@ -1651,9 +1658,10 @@ function showWeekHistory(wk) {
       return fmtName(pd.name) + mc + sc;
     }).join('<span style="color:var(--card-border)"> · </span>');
 
-    h += '<tr>' +
+    const histMe = r.playerId === meId();
+    h += '<tr' + (histMe ? ' class="my-row"' : '') + '>' +
       '<td class="' + (i===0?'rank-1':'text-muted text-small') + '">' + (i+1) + '</td>' +
-      '<td>' + escH(r.playerName) + ' ' + badge + '</td>' +
+      '<td>' + (histMe ? '<strong>' : '') + escH(r.playerName) + (histMe ? '</strong>' : '') + ' ' + badge + '</td>' +
       '<td class="text-small">' + pickDisplay + '</td>' +
       '<td class="r ' + scoreClass(r.total) + '" style="font-family:var(--mono);font-weight:600">' + fmtScore(r.total) + '</td>' +
       '<td class="r">' + money + '</td></tr>';
