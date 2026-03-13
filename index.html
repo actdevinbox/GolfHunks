@@ -1171,18 +1171,23 @@ function renderLeaderboardTable() {
 // "isWorst" = highest numerical total = worst fantasy performance = WINS money
 
 function calcMcPenalty(rows) {
-  // Only players who actually finished (not MC/WD/DQ) count toward the penalty baseline.
-  // Sort ascending: best score (most negative) first, worst score (most positive) last.
+  // Returns the MC floor (pre-major-mult) = 2nd worst made-cut score + 1.
+  // Each MC pick uses max(their actual score, floor) at scoring time.
   const playing = rows.filter(r => !r.isMC).sort((a,b) => a.score - b.score);
-  if (!playing.length) return 10; // fallback if entire field withdrew
-  // Worst finisher = last entry (highest score)
-  const worst = playing[playing.length - 1].score;
-  // Second-to-last finisher (second worst)
-  const secondWorst = playing.length >= 2 ? playing[playing.length - 2].score : worst;
-  // MC penalty = one stroke worse than the second-to-last finisher,
-  // and always at least one worse than the actual last-place finisher.
-  const pen = Math.max(secondWorst, worst) + 1;
-  return rows._isMajor ? pen * 2 : pen;
+  if (!playing.length) return 10; // fallback
+  const secondWorst = playing.length >= 2
+    ? playing[playing.length - 2].score
+    : playing[playing.length - 1].score;
+  return secondWorst + 1; // raw floor, no major multiplier applied here
+}
+
+// Per-golfer MC score: max(golfer actual 36-hole score, floor), then apply major mult.
+function mcPenaltyForGolfer(golfer, floor, mult) {
+  // golfer.score is their actual score (negative = under par); null if not recorded.
+  const actual = (golfer && golfer.score !== null && golfer.score !== undefined)
+    ? golfer.score
+    : floor;
+  return Math.max(actual, floor) * mult;
 }
 
 function findGolfer(name, rows) {
@@ -1239,10 +1244,10 @@ function calcWeekResults(wk) {
       const usageCount = playerUsage[name.toLowerCase().trim()] || 0;
       const overUsed = usageCount > state.settings.maxUses;
       const mult = rows._isMajor ? 2 : 1;
-      if (overUsed) return { name, score: mcScore, mc: true, overUsed: true };
+      if (overUsed) return { name, score: mcPenaltyForGolfer(null, mcScore, mult), mc: true, overUsed: true };
       const g = findGolfer(name, rows);
       if (!g) return { name, score: null, notFound: true };
-      if (g.isMC) return { name, score: mcScore, mc: true, major: mult===2 };
+      if (g.isMC) return { name, score: mcPenaltyForGolfer(g, mcScore, mult), mc: true, major: mult===2 };
       return { name, score: g.score * mult, major: mult===2 };
     });
 
@@ -1670,7 +1675,7 @@ function showWeekHistory(wk) {
 
   // MC penalty note
   if (lw.mcScore !== undefined) {
-    h += '<p class="text-small text-muted" style="margin-top:8px;">MC penalty applied at ' + fmtScore(lw.mcScore) + ' for this week.</p>';
+    h += '<p class="text-small text-muted" style="margin-top:8px;">MC floor: ' + fmtScore(lw.mcScore) + ' (each MC pick scored at max(actual, floor)).</p>';
   }
 
   el.innerHTML = h;
