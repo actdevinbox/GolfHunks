@@ -1246,7 +1246,7 @@ function calcWeekResults(wk) {
       const mult = rows._isMajor ? 2 : 1;
       if (overUsed) return { name, score: mcPenaltyForGolfer(null, mcScore, mult), mc: true, overUsed: true };
       const g = findGolfer(name, rows);
-      if (!g) return { name, score: null, notFound: true };
+      if (!g) return { name, score: mcPenaltyForGolfer(null, mcScore, mult), mc: true, notFound: true };
       if (g.isMC) return { name, score: mcPenaltyForGolfer(g, mcScore, mult), mc: true, major: mult===2 };
       return { name, score: g.score * mult, major: mult===2 };
     });
@@ -1300,7 +1300,7 @@ function renderWeeklyFantasyScores() {
 
     const pickDisplay = r.pickDetail.map(pd => {
       const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.52rem">MC</span>' : '';
-      const nf = pd.notFound && rows ? ' <span class="tag tag-gold" style="font-size:.52rem">?</span>' : '';
+      const nf = pd.notFound ? ' <span class="tag tag-gold" style="font-size:.52rem" title="Not in field — MC floor applied">?</span>' : '';
       const scoreStr = pd.score !== null ? ' <span class="' + scoreClass(pd.score, pd.mc) + '" style="font-size:.65rem">('+fmtScore(pd.score)+')</span>' : '';
       return '<span style="color:var(--text-muted)">' + fmtName(pd.name) + mc + nf + scoreStr + '</span>';
     }).join(', ');
@@ -1336,9 +1336,10 @@ function computePlayerStats() {
       ensureStat(r.playerId, r.playerName);
       var st = stats[r.playerId];
       (r.pickDetail || []).forEach(function(pd) {
-        if (pd.notFound) return;
+        // notFound picks now score at MC floor — count in total but not made-cut
         st.totalPicks++;
-        if (!pd.mc) st.madeCutPicks++;
+        if (!pd.mc && !pd.notFound) st.madeCutPicks++;
+        if (pd.notFound) return; // can't win with a player not in the field
         // Win pick: this pick matches the stored tournament winner name (fuzzy)
         if (winner && pd.name) {
           var pn = pd.name.toLowerCase().trim();
