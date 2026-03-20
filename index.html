@@ -1339,13 +1339,20 @@ function renderWeeklyFantasyScores() {
   }
 
   const rows = state.currentScores?.rows;
+  // Competitors only see their own picks until the week is locked.
+  // Admin always sees all. Week is considered "open" when scores aren't loaded yet.
+  const picksVisible = isAdmin() || !!rows; // scores loaded = week effectively revealed to all
+  const myPlayerId = meId();
+
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
-    '<th>#</th><th>Competitor</th><th>Picks</th>' +
+    '<th>#</th><th>Competitor</th>' +
+    (picksVisible ? '<th>Picks</th>' : '') +
     '<th class="r">Fantasy Score</th><th class="r">Money</th>' +
     '</tr></thead><tbody>';
 
   results.forEach((r, i) => {
     const sc = r.total !== null ? scoreClass(r.total) : '';
+    const wfsMe = r.player.id === myPlayerId;
 
     let badge = '', money = '—';
     if (r.isBest) {
@@ -1356,18 +1363,24 @@ function renderWeeklyFantasyScores() {
       money = '<span class="money-owe">-$' + state.settings.lowPenalty + '</span>';
     }
 
-    const pickDisplay = r.pickDetail.map(pd => {
-      const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.52rem">MC</span>' : '';
-      const nf = pd.notFound ? ' <span class="tag tag-gold" style="font-size:.52rem" title="Not in field — MC floor applied">?</span>' : '';
-      const scoreStr = pd.score !== null ? ' <span class="' + scoreClass(pd.score, pd.mc) + '" style="font-size:.65rem">('+fmtScore(pd.score)+')</span>' : '';
-      return '<span style="color:var(--text-muted)">' + fmtName(pd.name) + mc + nf + scoreStr + '</span>';
-    }).join(', ');
+    let pickCell = '';
+    if (picksVisible || wfsMe) {
+      // Show full picks — either scores loaded (week done) or it's their own row
+      const pickDisplay = r.pickDetail.map(pd => {
+        const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.52rem">MC</span>' : '';
+        const nf = pd.notFound ? ' <span class="tag tag-gold" style="font-size:.52rem" title="Not in field — MC floor applied">?</span>' : '';
+        const scoreStr = pd.score !== null ? ' <span class="' + scoreClass(pd.score, pd.mc) + '" style="font-size:.65rem">('+fmtScore(pd.score)+')</span>' : '';
+        return '<span style="color:var(--text-muted)">' + fmtName(pd.name) + mc + nf + scoreStr + '</span>';
+      }).join(', ');
+      pickCell = '<td class="text-small">' + pickDisplay + '</td>';
+    } else if (picksVisible) {
+      pickCell = '<td class="text-small text-muted">—</td>';
+    }
 
-    const wfsMe = r.player.id === meId();
     h += '<tr' + (wfsMe ? ' class="my-row"' : '') + '>' +
       '<td class="text-small ' + (i === 0 && r.total !== null ? 'rank-1' : 'text-muted') + '">' + (i+1) + '</td>' +
       '<td>' + (wfsMe ? '<strong>' : '') + escH(r.player.name) + (wfsMe ? '</strong>' : '') + ' ' + badge + '</td>' +
-      '<td class="text-small">' + pickDisplay + '</td>' +
+      (picksVisible ? pickCell : (wfsMe ? pickCell : '')) +
       '<td class="r ' + sc + '" style="font-family:var(--mono);font-weight:600">' + (r.total !== null ? fmtScore(r.total) : '—') + '</td>' +
       '<td class="r">' + money + '</td></tr>';
   });
@@ -1820,7 +1833,10 @@ function renderFieldTable() {
       : name.split(' ').map(function(s) { return s.trim(); });
     return parts.filter(Boolean).map(function(s) { return s[0].toUpperCase(); }).join('');
   }
-  state.players.forEach(p => h += '<th class="r hide-md text-small" title="' + escH(p.name) + '">' + escH(getInitials(p.name)) + '</th>');
+  state.players.forEach(p => {
+    const isMe = p.id === meId();
+    h += '<th class="r text-small' + (isMe ? ' my-col-header' : '') + '" title="' + escH(p.name) + '">' + escH(getInitials(p.name)) + (isMe ? ' ◀' : '') + '</th>';
+  });
   h += '</tr></thead><tbody>';
 
   rows.forEach(r => {
@@ -1829,7 +1845,7 @@ function renderFieldTable() {
     state.players.forEach(p => {
       const c = r.byPlayer[p.name] || 0;
       const cls = c >= state.settings.maxUses ? 'usage-max' : c >= 2 ? 'usage-warn' : c > 0 ? 'usage-ok' : 'text-muted';
-      h += '<td class="r hide-md text-small ' + cls + '" style="font-family:var(--mono)">' + (c || '—') + '</td>';
+      h += '<td class="r text-small ' + cls + '" style="font-family:var(--mono)">' + (c || '—') + '</td>';
     });
     h += '</tr>';
   });
@@ -2240,7 +2256,7 @@ function saveAdminPinSetup() {
 function showSiteGate() {
   const sel = document.getElementById('gateNameSelect');
   sel.innerHTML = '<option value="">— select your name —</option><option value="__admin__">Admin</option>';
-  state.players.forEach(function(p) {
+  [...state.players].sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(p) {
     const opt = document.createElement('option');
     opt.value = p.id; opt.textContent = p.name;
     sel.appendChild(opt);
@@ -2508,7 +2524,7 @@ function renderPicksLoginDropdown() {
   const sel = document.getElementById('picksLoginName');
   if (!sel) return;
   sel.innerHTML = '<option value="">— select —</option>';
-  state.players.forEach(function(p) {
+  [...state.players].sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(p) {
     const opt = document.createElement('option');
     opt.value = p.id; opt.textContent = p.name;
     sel.appendChild(opt);
@@ -2596,10 +2612,18 @@ function renderPicksEntry() {
 
   for (var i = 0; i < 5; i++) {
     const val = existing[i] || '';
-    h += '<div class="form-row">' +
+    // Compute initial usage badge for pre-filled value
+    const initKey = val.toLowerCase().trim();
+    const initUses = initKey ? (myUsage[initKey] || 0) : null;
+    const badgeHtml = initUses !== null ? buildUsageBadge(initUses, state.settings.maxUses) : '';
+    h += '<div class="form-row" style="margin-bottom:8px;">' +
       '<label>Golfer ' + (i+1) + '</label>' +
-      '<input type="text" class="pick-golfer-input" id="pickGolfer_' + i + '" ' +
-        'value="' + escH(val) + '" list="' + dlId + '" placeholder="Last, First" />' +
+      '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<input type="text" class="pick-golfer-input" id="pickGolfer_' + i + '" ' +
+          'value="' + escH(val) + '" list="' + dlId + '" placeholder="Last, First" ' +
+          'style="flex:1;" />' +
+        '<span id="usageBadge_' + i + '" style="min-width:54px;text-align:right;font-family:var(--mono);font-size:.7rem;white-space:nowrap;">' + badgeHtml + '</span>' +
+      '</div>' +
       '</div>';
   }
 
@@ -2618,6 +2642,13 @@ function renderPicksEntry() {
   document.querySelectorAll('.pick-golfer-input').forEach(function(inp) {
     inp.addEventListener('input', checkPickUsage);
   });
+}
+
+function buildUsageBadge(uses, max) {
+  if (uses === 0) return '<span style="color:var(--text-muted)">0/' + max + '</span>';
+  if (uses >= max) return '<span style="color:#e07070;font-weight:700">' + uses + '/' + max + ' MAX</span>';
+  if (uses === max - 1) return '<span style="color:var(--gold);font-weight:600">' + uses + '/' + max + '</span>';
+  return '<span style="color:#5dcc7a">' + uses + '/' + max + '</span>';
 }
 
 function checkPickUsage() {
@@ -2650,6 +2681,30 @@ function checkPickUsage() {
     if (pastUses >= state.settings.maxUses) warnings.push(fmtName(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
     else if (pastUses === state.settings.maxUses - 1) warnings.push(fmtName(g) + ' — this would be your last allowed use');
   });
+
+  // Refresh per-input usage badges
+  const player2 = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (player2) {
+    const myUsage2 = {};
+    Object.keys(state.lockedWeeks).forEach(function(lwk) {
+      const lw = state.lockedWeeks[lwk];
+      lw.results.forEach(function(r) {
+        if (r.playerId !== player2.id) return;
+        r.picks.forEach(function(g) {
+          var k = g.toLowerCase().trim();
+          myUsage2[k] = (myUsage2[k]||0)+1;
+        });
+      });
+    });
+    document.querySelectorAll('.pick-golfer-input').forEach(function(inp, idx) {
+      const badgeEl = document.getElementById('usageBadge_' + idx);
+      if (!badgeEl) return;
+      const k = inp.value.toLowerCase().trim();
+      if (!k) { badgeEl.innerHTML = ''; return; }
+      const uses = myUsage2[k] || 0;
+      badgeEl.innerHTML = buildUsageBadge(uses, state.settings.maxUses);
+    });
+  }
 
   const warnEl = document.getElementById('picksUsageWarning');
   if (warnEl) {
@@ -2733,9 +2788,9 @@ function renderAll() {
   if (apEl) apEl.placeholder = s.adminPin ? '••••  (set — enter new to change)' : '4 digits';
   ['lockWeekNum','lockWeekNum2'].forEach(id => document.getElementById(id).textContent = state.currentWeek);
 
-  const parts = s.leagueName.split(' '), last = parts.pop();
-  document.querySelector('header h1').innerHTML = '⛳ ' + parts.join(' ') + ' <span>' + last + '</span>';
-  document.title = s.leagueName;
+  // Always show GolfHunks branding regardless of stored leagueName
+  document.querySelector('header h1').innerHTML = '⛳ GolfHunks';
+  document.title = 'GolfHunks';
 
   updateBanner();
   updateAdminWeekSelectors();
