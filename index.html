@@ -2535,7 +2535,7 @@ function renderPicksEntry() {
   const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
   if (!player) { competitorLogout(); return; }
 
-  document.getElementById('picksEntryTitle').textContent = player.name + ' — Week ' + state.currentWeek + ' Picks';
+  document.getElementById('picksEntryTitle').textContent = 'Enter 5 golfers — max ' + state.settings.maxUses + ' uses per golfer this season';
 
   // Deadline banner
   const banner = document.getElementById('picksDeadlineBanner');
@@ -2607,8 +2607,6 @@ function renderPicksEntry() {
   });
   h += '</datalist>';
 
-  h += '<p class="text-small text-muted" style="margin-bottom:12px;">Enter ' +
-    state.settings.maxUses + ' golfers. Max uses per golfer this season: <strong>' + state.settings.maxUses + '</strong>.</p>';
 
   for (var i = 0; i < 5; i++) {
     const val = existing[i] || '';
@@ -2645,10 +2643,10 @@ function renderPicksEntry() {
 }
 
 function buildUsageBadge(uses, max) {
-  if (uses === 0) return '<span style="color:var(--text-muted)">0/' + max + '</span>';
-  if (uses >= max) return '<span style="color:#e07070;font-weight:700">' + uses + '/' + max + ' MAX</span>';
-  if (uses === max - 1) return '<span style="color:var(--gold);font-weight:600">' + uses + '/' + max + '</span>';
-  return '<span style="color:#5dcc7a">' + uses + '/' + max + '</span>';
+  // Plain x/max — muted when unused, gold when at max
+  if (!uses) return '<span style="color:var(--text-muted);opacity:.5">0/' + max + '</span>';
+  if (uses >= max) return '<span style="color:var(--gold);font-weight:700">' + uses + '/' + max + '</span>';
+  return '<span style="color:var(--text-muted)">' + uses + '/' + max + '</span>';
 }
 
 function checkPickUsage() {
@@ -2683,25 +2681,37 @@ function checkPickUsage() {
   });
 
   // Refresh per-input usage badges
+  // Count = locked-week history + OTHER current inputs that have the same golfer
   const player2 = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
   if (player2) {
-    const myUsage2 = {};
+    // Base usage from locked weeks
+    const lockedUsage = {};
     Object.keys(state.lockedWeeks).forEach(function(lwk) {
       const lw = state.lockedWeeks[lwk];
       lw.results.forEach(function(r) {
         if (r.playerId !== player2.id) return;
         r.picks.forEach(function(g) {
           var k = g.toLowerCase().trim();
-          myUsage2[k] = (myUsage2[k]||0)+1;
+          lockedUsage[k] = (lockedUsage[k]||0)+1;
         });
       });
     });
-    document.querySelectorAll('.pick-golfer-input').forEach(function(inp, idx) {
+
+    const allInputs = document.querySelectorAll('.pick-golfer-input');
+
+    allInputs.forEach(function(inp, idx) {
       const badgeEl = document.getElementById('usageBadge_' + idx);
       if (!badgeEl) return;
       const k = inp.value.toLowerCase().trim();
       if (!k) { badgeEl.innerHTML = ''; return; }
-      const uses = myUsage2[k] || 0;
+
+      // Count how many OTHER inputs (not this one) have the same golfer this week
+      var thisWeekExtra = 0;
+      allInputs.forEach(function(other, otherIdx) {
+        if (otherIdx !== idx && other.value.toLowerCase().trim() === k) thisWeekExtra++;
+      });
+
+      const uses = (lockedUsage[k] || 0) + thisWeekExtra;
       badgeEl.innerHTML = buildUsageBadge(uses, state.settings.maxUses);
     });
   }
