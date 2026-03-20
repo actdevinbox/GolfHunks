@@ -2650,9 +2650,10 @@ function renderPicksEntry() {
 
   body.innerHTML = h;
 
-  // Wire up usage checking on input
+  // Wire up usage checking on input AND change (datalist mobile fires change)
   document.querySelectorAll('.pick-golfer-input').forEach(function(inp) {
     inp.addEventListener('input', checkPickUsage);
+    inp.addEventListener('change', checkPickUsage);
   });
 }
 
@@ -2723,13 +2724,13 @@ function checkPickUsage() {
       const k = normName(inp.value);
       if (!k) { badgeEl.innerHTML = ''; return; }
 
-      // Count how many OTHER inputs (not this one) have the same golfer this week
-      var thisWeekExtra = 0;
-      allInputs.forEach(function(other, otherIdx) {
-        if (otherIdx !== idx && normName(other.value) === k) thisWeekExtra++;
+      // Count ALL inputs (including this one) that have this golfer this week
+      var thisWeekCount = 0;
+      allInputs.forEach(function(other) {
+        if (normName(other.value) === k) thisWeekCount++;
       });
 
-      const uses = (lockedUsage[k] || 0) + thisWeekExtra;
+      const uses = (lockedUsage[k] || 0) + thisWeekCount;
       badgeEl.innerHTML = buildUsageBadge(uses, state.settings.maxUses);
     });
   }
