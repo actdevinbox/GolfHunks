@@ -2633,6 +2633,7 @@ function renderPicksEntry() {
     '<button class="btn-ghost" onclick="renderPicksEntry()">Reset</button>' +
     '</div>';
   h += '<div id="picksSubmitMsg" style="margin-top:10px;font-family:var(--mono);font-size:.74rem;"></div>';
+  h += '<div id="usageDebug" style="margin-top:14px;font-family:var(--mono);font-size:.66rem;color:var(--text-muted);padding:8px;background:rgba(0,0,0,.3);border-radius:4px;display:none;"></div>';
 
   body.innerHTML = h;
 
@@ -2698,6 +2699,18 @@ function checkPickUsage() {
     });
 
     const allInputs = document.querySelectorAll('.pick-golfer-input');
+
+    // Debug dump — shows what's in lockedUsage vs what inputs contain
+    const debugEl = document.getElementById('usageDebug');
+    if (debugEl) {
+      const inputVals = [];
+      allInputs.forEach(function(inp) { if (inp.value.trim()) inputVals.push(inp.value.trim()); });
+      const lockedKeys = Object.keys(lockedUsage);
+      debugEl.style.display = '';
+      debugEl.innerHTML =
+        '<strong>Locked usage keys (' + lockedKeys.length + '):</strong> ' + lockedKeys.map(escH).join(' | ') + '<br>' +
+        '<strong>Input values:</strong> ' + inputVals.map(escH).join(' | ');
+    }
 
     allInputs.forEach(function(inp, idx) {
       const badgeEl = document.getElementById('usageBadge_' + idx);
