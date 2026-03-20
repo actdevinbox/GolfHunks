@@ -1090,6 +1090,20 @@ function fmtName(raw) {
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function meId() { return (_session && !_session.isAdmin) ? _session.id : null; }
 
+// Normalise a golfer name to lowercase "last, first" for consistent key matching.
+// Handles both "First Last" and "Last, First" input formats.
+function normName(raw) {
+  if (!raw) return '';
+  const s = raw.trim().toLowerCase();
+  if (s.includes(',')) return s.replace(/,\s+/, ', '); // already "last, first" — normalise spacing
+  // "first last" → "last, first"
+  const parts = s.split(/\s+/);
+  if (parts.length < 2) return s;
+  const last = parts[parts.length - 1];
+  const first = parts.slice(0, parts.length - 1).join(' ');
+  return last + ', ' + first;
+}
+
 let lbShowAll = false;
 function toggleLeaderboardExpand() {
   lbShowAll = !lbShowAll;
@@ -2633,7 +2647,6 @@ function renderPicksEntry() {
     '<button class="btn-ghost" onclick="renderPicksEntry()">Reset</button>' +
     '</div>';
   h += '<div id="picksSubmitMsg" style="margin-top:10px;font-family:var(--mono);font-size:.74rem;"></div>';
-  h += '<div id="usageDebug" style="margin-top:14px;font-family:var(--mono);font-size:.66rem;color:var(--text-muted);padding:8px;background:rgba(0,0,0,.3);border-radius:4px;display:none;"></div>';
 
   body.innerHTML = h;
 
@@ -2661,14 +2674,18 @@ function checkPickUsage() {
       if (r.playerId !== player.id) return;
       r.picks.forEach(function(g) {
         var k = g.toLowerCase().trim();
-        golferUsageByPlayer[player.id][k] = (golferUsageByPlayer[player.id][k]||0)+1;
+        golferUsageByPlayer[player.id][normName(g)] = (golferUsageByPlayer[player.id][normName(g)]||0)+1;
       });
     });
   });
-  const myUsage = golferUsageByPlayer[player.id] || {};
+  // Rebuild myUsage with normalised keys
+  const myUsageNorm = {};
+  Object.keys(golferUsageByPlayer[player.id] || {}).forEach(function(k) {
+    myUsageNorm[normName(k)] = golferUsageByPlayer[player.id][k];
+  });
   const inputs = document.querySelectorAll('.pick-golfer-input');
   const entered = [];
-  inputs.forEach(function(inp) { if (inp.value.trim()) entered.push(inp.value.trim().toLowerCase()); });
+  inputs.forEach(function(inp) { if (inp.value.trim()) entered.push(normName(inp.value)); });
 
   const warnings = [];
   const seen = {};
@@ -2676,7 +2693,7 @@ function checkPickUsage() {
     if (!g) return;
     seen[g] = (seen[g]||0)+1;
     if (seen[g] > 1) { warnings.push('"' + g + '" entered more than once this week'); return; }
-    const pastUses = myUsage[g] || 0;
+    const pastUses = myUsageNorm[g] || 0;
     if (pastUses >= state.settings.maxUses) warnings.push(fmtName(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
     else if (pastUses === state.settings.maxUses - 1) warnings.push(fmtName(g) + ' — this would be your last allowed use');
   });
@@ -2685,14 +2702,14 @@ function checkPickUsage() {
   // Count = locked-week history + OTHER current inputs that have the same golfer
   const player2 = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
   if (player2) {
-    // Base usage from locked weeks
+    // Base usage from locked weeks — normalise all names to "last, first"
     const lockedUsage = {};
     Object.keys(state.lockedWeeks).forEach(function(lwk) {
       const lw = state.lockedWeeks[lwk];
       lw.results.forEach(function(r) {
         if (r.playerId !== player2.id) return;
         r.picks.forEach(function(g) {
-          var k = g.toLowerCase().trim();
+          var k = normName(g);
           lockedUsage[k] = (lockedUsage[k]||0)+1;
         });
       });
@@ -2700,28 +2717,16 @@ function checkPickUsage() {
 
     const allInputs = document.querySelectorAll('.pick-golfer-input');
 
-    // Debug dump — shows what's in lockedUsage vs what inputs contain
-    const debugEl = document.getElementById('usageDebug');
-    if (debugEl) {
-      const inputVals = [];
-      allInputs.forEach(function(inp) { if (inp.value.trim()) inputVals.push(inp.value.trim()); });
-      const lockedKeys = Object.keys(lockedUsage);
-      debugEl.style.display = '';
-      debugEl.innerHTML =
-        '<strong>Locked usage keys (' + lockedKeys.length + '):</strong> ' + lockedKeys.map(escH).join(' | ') + '<br>' +
-        '<strong>Input values:</strong> ' + inputVals.map(escH).join(' | ');
-    }
-
     allInputs.forEach(function(inp, idx) {
       const badgeEl = document.getElementById('usageBadge_' + idx);
       if (!badgeEl) return;
-      const k = inp.value.toLowerCase().trim();
+      const k = normName(inp.value);
       if (!k) { badgeEl.innerHTML = ''; return; }
 
       // Count how many OTHER inputs (not this one) have the same golfer this week
       var thisWeekExtra = 0;
       allInputs.forEach(function(other, otherIdx) {
-        if (otherIdx !== idx && other.value.toLowerCase().trim() === k) thisWeekExtra++;
+        if (otherIdx !== idx && normName(other.value) === k) thisWeekExtra++;
       });
 
       const uses = (lockedUsage[k] || 0) + thisWeekExtra;
