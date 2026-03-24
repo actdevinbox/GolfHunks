@@ -449,6 +449,10 @@
         Upload a player list CSV in <strong>Admin → Player List CSV</strong>.<br>
         Required columns: <code>owgr_rank</code>, <code>player_name</code> (format: <code>Last, First</code>).
       </div>
+      <div class="flex" style="margin-bottom:10px;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm" id="fieldToggleField" onclick="setFieldView('field')" style="opacity:1;">This Week's Field</button>
+        <button class="btn-ghost btn-sm" id="fieldToggleAll" onclick="setFieldView('all')">All Players</button>
+      </div>
       <div class="flex" style="margin-bottom:13px;">
         <input type="text" id="fieldSearch" placeholder="Search player..." oninput="renderFieldTable()" style="max-width:260px;" />
         <span class="text-small text-muted" id="fieldCount"></span>
@@ -1031,7 +1035,7 @@ function loadScores() {
 }
 
 function clearScores() {
-  state.currentScores = null; state.currentRound = ''; pendingScoreCsv = null; saveState();
+  state.currentScores = null; state.currentRound = ''; state.currentTournName = ''; pendingScoreCsv = null; saveState();
   document.getElementById('scoreDropZone').classList.remove('file-loaded');
   document.getElementById('scoreDropLabel').textContent = '📄 Click or drag & drop scores CSV here';
   document.getElementById('scorePreview').innerHTML = '';
@@ -1110,12 +1114,16 @@ function loadPlayerList() {
     .filter(r => r.player_name)
     .sort((a,b) => a.owgr_rank - b.owgr_rank);
 
-  // Auto-set tournament name from event_name if not already set
-  if (pendingPlayerCsv._eventName && !state.currentTournName) {
+  // Always set tournament name from event_name when loading a new field file
+  if (pendingPlayerCsv._eventName) {
     state.currentTournName = pendingPlayerCsv._eventName;
     const inp = document.getElementById('uploadTournName');
     if (inp) inp.value = pendingPlayerCsv._eventName;
   }
+  // Clear stale scores from previous tournament
+  state.currentScores = null;
+  state.currentRound = pendingPlayerCsv._currentRound || '';
+  pendingScoreCsv = null;
 
   saveState();
   renderFieldTable();
@@ -1860,6 +1868,16 @@ function showWeekHistory(wk) {
 
 // ═══ FIELD TAB ════════════════════════════════════════════════════════════════
 let fieldSort = { col: 'owgr', dir: 1 };
+let fieldView = 'field'; // 'field' = current player list, 'all' = all ever picked
+
+function setFieldView(v) {
+  fieldView = v;
+  const fBtn = document.getElementById('fieldToggleField');
+  const aBtn = document.getElementById('fieldToggleAll');
+  if (fBtn) { fBtn.className = v === 'field' ? 'btn btn-sm' : 'btn-ghost btn-sm'; }
+  if (aBtn) { aBtn.className = v === 'all'   ? 'btn btn-sm' : 'btn-ghost btn-sm'; }
+  renderFieldTable();
+}
 
 function renderFieldTable() {
   const el = document.getElementById('field-table'), cnt = document.getElementById('fieldCount');
@@ -1898,7 +1916,30 @@ function renderFieldTable() {
   });
 
   const q = (document.getElementById('fieldSearch').value || '').trim().toLowerCase();
-  let rows = state.playerList.map(p => ({
+
+  // Build player source based on toggle
+  let playerSource;
+  if (fieldView === 'all') {
+    // All unique golfer names ever picked (current + locked weeks)
+    const allNames = {};
+    state.players.forEach(p => {
+      Object.values(state.picks).forEach(wk => {
+        (wk[p.id] || []).forEach(g => { allNames[g] = allNames[g] || { owgr_rank: 9999, player_name: g }; });
+      });
+    });
+    Object.values(state.lockedWeeks).forEach(lw => {
+      lw.results.forEach(r => {
+        r.picks.forEach(g => { allNames[g] = allNames[g] || { owgr_rank: 9999, player_name: g }; });
+      });
+    });
+    // Also include current playerList entries so OWGR ranks are correct
+    state.playerList.forEach(p => { allNames[p.player_name] = p; });
+    playerSource = Object.values(allNames);
+  } else {
+    playerSource = state.playerList;
+  }
+
+  let rows = playerSource.map(p => ({
     owgr: p.owgr_rank, name: p.player_name,
     total: (() => {
       const s = sel[p.player_name] || sel[p.player_name.split(',').length > 1
