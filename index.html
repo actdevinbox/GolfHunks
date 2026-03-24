@@ -2599,8 +2599,8 @@ function enterApp() {
     document.getElementById('picksLoginCard').style.display = 'none';
     document.getElementById('picksEntryCard').style.display = '';
   }
+  showTab('standings'); // show tab first so standings renders into a visible element
   renderAll();
-  showTab('standings');
 }
 
 function siteLogout() {
