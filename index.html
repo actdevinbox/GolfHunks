@@ -1525,18 +1525,23 @@ function renderWeeklyFantasyScores() {
   }
 
   const rows = state.currentScores?.rows;
-  // Competitors only see their own picks until the week is locked.
-  // Admin always sees all. Week is considered "open" when scores aren't loaded yet.
-  const picksVisible = isAdmin() || !!rows; // scores loaded = week effectively revealed to all
+  const picksVisible = isAdmin() || !!rows;
   const myPlayerId = meId();
-
+  const mksW = (lbl, col) => mkSortTh(lbl, col, wfsSort, 'sortWfs');
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
     '<th>#</th><th>Competitor</th>' +
     (picksVisible ? '<th>Picks</th>' : '') +
-    '<th class="r">Fantasy Score</th><th class="r">Money</th>' +
+    mksW('Score','total') + mksW('Money','money') +
     '</tr></thead><tbody>';
 
-  results.forEach((r, i) => {
+  const sortedResults = [...results].sort((a, b) => {
+    if (wfsSort.col === 'money') {
+      const moneyVal = r => r.isBest ? 1 : r.isWorst ? -1 : 0;
+      return wfsSort.dir * (moneyVal(a) - moneyVal(b));
+    }
+    return wfsSort.dir * ((a.total ?? 9999) - (b.total ?? 9999));
+  });
+  sortedResults.forEach((r, i) => {
     const sc = r.total !== null ? scoreClass(r.total) : '';
     const wfsMe = r.player.id === myPlayerId;
 
@@ -1582,12 +1587,23 @@ function renderWeeklyFantasyScores() {
 function computePlayerStats() {
   var stats = {};
   function ensureStat(id, name) {
-    if (!stats[id]) stats[id] = { name: name, winPicks: 0, madeCutPicks: 0, totalPicks: 0, madeCutPct: null };
+    if (!stats[id]) stats[id] = { name: name, weekWins: 0, winPicks: 0, madeCutPicks: 0, totalPicks: 0, madeCutPct: null };
   }
   Object.values(state.lockedWeeks).forEach(function(lw) {
-    // tournWinner is stored at lock time (the golfer with the lowest score in the full field)
-    // For legacy locked weeks without tournWinner, fall back to null (no credit given)
-    // Support both legacy single tournWinner and new tournWinners array
+    // ── Weekly fantasy wins (best competitor score that week) ──
+    // Find the best (lowest) total among all competitors this week
+    var weekBestTotal = Infinity;
+    lw.results.forEach(function(r) { if (r.total !== null && r.total < weekBestTotal) weekBestTotal = r.total; });
+    if (weekBestTotal !== Infinity) {
+      var weekWinners = lw.results.filter(function(r) { return r.total === weekBestTotal; });
+      var weekWinCredit = 1 / weekWinners.length;
+      weekWinners.forEach(function(r) {
+        ensureStat(r.playerId, r.playerName);
+        stats[r.playerId].weekWins = Math.round((stats[r.playerId].weekWins + weekWinCredit) * 10) / 10;
+      });
+    }
+
+    // ── Tournament champion pick ──
     var winners = [];
     if (lw.tournWinners && lw.tournWinners.length) {
       winners = lw.tournWinners.map(function(w){ return w.toLowerCase().trim(); });
@@ -1788,8 +1804,26 @@ function renderCumulativeStandings() {
 
   // Tag each player data entry with its id for stat lookup
   Object.entries(playerData).forEach(function(kv) { kv[1]._id = kv[0]; });
+  // Attach stats for sorting
+  const pStats2pre = computePlayerStats();
   const rows = Object.values(playerData).filter(p => Object.keys(p.weeks).length > 0);
-  rows.sort((a,b) => a.total - b.total);
+  rows.forEach(r => {
+    const st = pStats2pre[r._id] || {};
+    r._weekWins   = st.weekWins   || 0;
+    r._champPicks = st.winPicks   || 0;
+    r._madeCutPct = st.madeCutPct || 0;
+  });
+  const cumSortFn = (a, b) => {
+    let av, bv;
+    if (cumSort.col === 'total')      { av = a.total;      bv = b.total; }
+    else if (cumSort.col === 'balance')  { av = a.balance;    bv = b.balance; }
+    else if (cumSort.col === 'weekWins') { av = a._weekWins;  bv = b._weekWins; }
+    else if (cumSort.col === 'champPicks') { av = a._champPicks; bv = b._champPicks; }
+    else if (cumSort.col === 'madeCutPct') { av = a._madeCutPct; bv = b._madeCutPct; }
+    else { av = a.total; bv = b.total; }
+    return cumSort.dir * ((av > bv ? 1 : av < bv ? -1 : 0));
+  };
+  rows.sort(cumSortFn);
 
   // For bar chart: find score range
   const totals = rows.map(r => r.total);
@@ -1799,10 +1833,13 @@ function renderCumulativeStandings() {
   // Reverse week order: most recent first
   const wksDesc = [...lockedWks].reverse();
 
-  const pStats2 = computePlayerStats();
+  const pStats2 = pStats2pre; // already computed for sorting
+  const mks = (lbl, col, cls) => mkSortTh(lbl, col, cumSort, 'sortCum', cls);
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
-    '<th>#</th><th>Competitor</th><th class="r">Balance</th><th class="r">Total</th>' +
-    '<th class="r" title="Times picked the tournament winner">🎯 Wins</th><th class="r" title="Made-cut percentage">MC%</th>';
+    '<th>#</th><th>Competitor</th>' +
+    mks('Balance','balance') + mks('Total','total') +
+    mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct') +
+    '<th></th>';
   wksDesc.forEach(wk => {
     const lw = state.lockedWeeks[wk];
     const short = escH(lw.tournName).slice(0,14);
@@ -1831,7 +1868,9 @@ function renderCumulativeStandings() {
 
     // stat cells — before weekly columns
     const cSt = pStats2[r._id];
-    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? (Number.isInteger(cSt.winPicks) ? cSt.winPicks : cSt.winPicks.toFixed(1)) : '—') + '</td>';
+    const fmtStat = v => v === 0 ? '0' : Number.isInteger(v) ? v : v.toFixed(1);
+    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.weekWins) : '—') + '</td>';
+    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.winPicks) : '—') + '</td>';
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt && cSt.madeCutPct !== null ? cSt.madeCutPct + '%' : '—') + '</td>';
 
     wksDesc.forEach(wk => {
@@ -1851,7 +1890,7 @@ function renderCumulativeStandings() {
   h += '<div style="margin-top:14px;font-family:var(--mono);font-size:.7rem;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap;">' +
     '<span>🥇 Best weekly score wins $' + state.settings.highPrize + '</span>' +
     '<span>💸 Worst weekly score owes $' + state.settings.lowPenalty + '</span>' +
-    '<span>🎯 Wins = picked the tournament winner</span>' +
+    '<span>🏆 Wins = best weekly score (partial for ties) · 🎯 Champ = picked tournament champion</span>' +
     '<span>' + lockedWks.length + ' week' + (lockedWks.length!==1?'s':'') + ' locked</span>' +
     '</div>';
 
@@ -1950,7 +1989,18 @@ function showWeekHistory(wk) {
 }
 
 // ═══ FIELD TAB ════════════════════════════════════════════════════════════════
-let fieldSort = { col: 'owgr', dir: 1 };
+let fieldSort    = { col: 'owgr', dir: 1 };
+let cumSort      = { col: 'total', dir: 1 };
+let histSort     = { col: 'total', dir: 1 };
+let wfsSort      = { col: 'total', dir: 1 };
+
+function mkSortTh(label, col, sortObj, renderFn, extraCls) {
+  const active = sortObj.col === col;
+  const arrow  = sortObj.dir === 1 ? ' ↑' : ' ↓';
+  const cls    = 'sortable r' + (active ? ' sort-active' : '') + (extraCls ? ' ' + extraCls : '');
+  return '<th class="' + cls + '" onclick="' + renderFn + '(\'' + col + '\')" style="cursor:pointer;">' +
+    label + (active ? arrow : '') + '</th>';
+}
 let fieldView = 'field'; // 'field' = current player list, 'all' = all ever picked
 
 function setFieldView(v) {
@@ -2080,6 +2130,16 @@ function renderFieldTable() {
     h += '</tr>';
   });
   el.innerHTML = h + '</tbody></table></div>';
+}
+function sortCum(col) {
+  cumSort.dir = cumSort.col === col ? -cumSort.dir : 1;
+  cumSort.col = col;
+  renderCumulativeStandings();
+}
+function sortWfs(col) {
+  wfsSort.dir = wfsSort.col === col ? -wfsSort.dir : 1;
+  wfsSort.col = col;
+  renderWeeklyFantasyScores();
 }
 function sortField(col) {
   if (fieldSort.col === col) fieldSort.dir *= -1;
