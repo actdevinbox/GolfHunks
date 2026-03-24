@@ -1529,7 +1529,7 @@ function renderWeeklyFantasyScores() {
   const myPlayerId = meId();
   const mksW = (lbl, col) => mkSortTh(lbl, col, wfsSort, 'sortWfs');
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
-    '<th>#</th><th>Competitor</th>' +
+    '<th>#</th>' + mksW('Competitor','name') +
     (picksVisible ? '<th>Picks</th>' : '') +
     mksW('Score','total') + mksW('Money','money') +
     '</tr></thead><tbody>';
@@ -1539,6 +1539,7 @@ function renderWeeklyFantasyScores() {
       const moneyVal = r => r.isBest ? 1 : r.isWorst ? -1 : 0;
       return wfsSort.dir * (moneyVal(a) - moneyVal(b));
     }
+    if (wfsSort.col === 'name') return wfsSort.dir * a.player.name.localeCompare(b.player.name);
     return wfsSort.dir * ((a.total ?? 9999) - (b.total ?? 9999));
   });
   sortedResults.forEach((r, i) => {
@@ -1820,6 +1821,12 @@ function renderCumulativeStandings() {
     else if (cumSort.col === 'weekWins') { av = a._weekWins;  bv = b._weekWins; }
     else if (cumSort.col === 'champPicks') { av = a._champPicks; bv = b._champPicks; }
     else if (cumSort.col === 'madeCutPct') { av = a._madeCutPct; bv = b._madeCutPct; }
+    else if (cumSort.col === 'name')         { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
+    else if (cumSort.col.startsWith('wk_')) {
+      const wkNum = parseInt(cumSort.col.slice(3));
+      av = (a.weeks[wkNum] ? a.weeks[wkNum].total : 9999);
+      bv = (b.weeks[wkNum] ? b.weeks[wkNum].total : 9999);
+    }
     else { av = a.total; bv = b.total; }
     return cumSort.dir * ((av > bv ? 1 : av < bv ? -1 : 0));
   };
@@ -1836,14 +1843,14 @@ function renderCumulativeStandings() {
   const pStats2 = pStats2pre; // already computed for sorting
   const mks = (lbl, col, cls) => mkSortTh(lbl, col, cumSort, 'sortCum', cls);
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
-    '<th>#</th><th>Competitor</th>' +
+    '<th>#</th>' + mks('Competitor','name','') +
     mks('Balance','balance') + mks('Total','total') +
     mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct') +
     '<th></th>';
   wksDesc.forEach(wk => {
     const lw = state.lockedWeeks[wk];
     const short = escH(lw.tournName).slice(0,14);
-    h += '<th class="r hide-md" title="' + escH(lw.tournName) + '">' + short + '</th>';
+    h += mkSortTh(short, 'wk_'+wk, cumSort, 'sortCum', 'hide-md');
   });
   h += '</tr></thead><tbody>';
 
@@ -1908,8 +1915,16 @@ function renderMoneyTable() {
     });
   });
   if (!rows.length) { el.innerHTML = '<div class="empty">No locked weeks yet.</div>'; return; }
-  let h = '<table class="data-table"><thead><tr><th>Wk</th><th>Tournament</th><th>Competitor</th><th>Event</th><th class="r">Amount</th></tr></thead><tbody>';
-  rows.sort((a,b) => b.wk - a.wk).forEach(r => {
+  const mksM = (lbl, col) => mkSortTh(lbl, col, moneySort, 'sortMoney');
+  let h = '<table class="data-table"><thead><tr>' +
+    mksM('Wk','wk') + mksM('Tournament','tourn') + mksM('Competitor','name') +
+    '<th>Event</th>' + mksM('Amount','amt') + '</tr></thead><tbody>';
+  rows.sort((a,b) => {
+    if (moneySort.col === 'name')  return moneySort.dir * a.name.localeCompare(b.name);
+    if (moneySort.col === 'tourn') return moneySort.dir * a.tourn.localeCompare(b.tourn);
+    if (moneySort.col === 'amt')   return moneySort.dir * (a.amt - b.amt);
+    return moneySort.dir * (a.wk - b.wk);
+  }).forEach(r => {
     h += '<tr>' +
       '<td class="text-small">' + r.wk + '</td>' +
       '<td class="text-small text-muted">' + escH(r.tourn) + '</td>' +
@@ -1950,13 +1965,19 @@ function showWeekHistory(wk) {
   if (!lw) return;
 
   const el = document.getElementById('history-detail');
-  const sorted = [...lw.results].sort((a,b) => (a.total??9999) - (b.total??9999));
+  const sorted = [...lw.results].sort((a,b) => {
+    if (histSort.col === 'name')  return histSort.dir * a.playerName.localeCompare(b.playerName);
+    if (histSort.col === 'money') return histSort.dir * ((b.isBest?1:b.isWorst?-1:0) - (a.isBest?1:a.isWorst?-1:0));
+    return histSort.dir * ((a.total??9999) - (b.total??9999));
+  });
 
   let h = '<div style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted);margin-bottom:12px;">' +
     'Week ' + wk + ' · ' + escH(lw.tournName) + ' · Locked ' + (lw.lockedAt || '') + '</div>';
 
+  const mksH = (lbl, col) => mkSortTh(lbl, col, histSort, 'sortHist');
   h += '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
-    '<th>#</th><th>Competitor</th><th>Picks &amp; Scores</th><th class="r">Total</th><th class="r">Money</th>' +
+    '<th>#</th>' + mksH('Competitor','name') + '<th>Picks &amp; Scores</th>' +
+    mksH('Total','total') + mksH('Money','money') +
     '</tr></thead><tbody>';
 
   sorted.forEach((r, i) => {
@@ -1993,6 +2014,7 @@ let fieldSort    = { col: 'owgr', dir: 1 };
 let cumSort      = { col: 'total', dir: 1 };
 let histSort     = { col: 'total', dir: 1 };
 let wfsSort      = { col: 'total', dir: 1 };
+let moneySort    = { col: 'wk', dir: -1 };
 
 function mkSortTh(label, col, sortObj, renderFn, extraCls) {
   const active = sortObj.col === col;
@@ -2090,8 +2112,15 @@ function renderFieldTable() {
   }));
   if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
   rows.sort((a,b) => {
-    let av = a[fieldSort.col], bv = b[fieldSort.col];
-    if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    let av, bv;
+    if (fieldSort.col.startsWith('player:')) {
+      const pname = fieldSort.col.slice(7);
+      av = a.byPlayer[pname] || 0;
+      bv = b.byPlayer[pname] || 0;
+    } else {
+      av = a[fieldSort.col]; bv = b[fieldSort.col];
+      if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    }
     return fieldSort.dir * (av > bv ? 1 : av < bv ? -1 : 0);
   });
   cnt.textContent = rows.length + ' players' + (q ? ' (filtered)' : '');
@@ -2115,7 +2144,12 @@ function renderFieldTable() {
   }
   state.players.forEach(p => {
     const isMe = p.id === meId();
-    h += '<th class="r text-small' + (isMe ? ' my-col-header' : '') + '" title="' + escH(p.name) + '">' + escH(getInitials(p.name)) + (isMe ? ' ◀' : '') + '</th>';
+    const colKey = 'player:' + p.name;
+    const active = fieldSort.col === colKey;
+    const arrow  = active ? (' ' + (fieldSort.dir === -1 ? '\u2191' : '\u2193')) : '';
+    const cls    = 'r text-small sortable' + (isMe ? ' my-col-header' : '') + (active ? ' sort-active' : '');
+    h += '<th class="' + cls + '" title="' + escH(p.name) + '" onclick="sortField(\'' + colKey + '\')">' +
+      escH(getInitials(p.name)) + (isMe ? ' ◀' : '') + arrow + '</th>';
   });
   h += '</tr></thead><tbody>';
 
@@ -2141,9 +2175,26 @@ function sortWfs(col) {
   wfsSort.col = col;
   renderWeeklyFantasyScores();
 }
+function sortMoney(col) {
+  moneySort.dir = moneySort.col === col ? -moneySort.dir : 1;
+  moneySort.col = col;
+  renderMoneyTable();
+}
+function sortHist(col) {
+  histSort.dir = histSort.col === col ? -histSort.dir : 1;
+  histSort.col = col;
+  // Re-render last selected week
+  const active = document.querySelector('.week-pill.active');
+  if (active) showWeekHistory(parseInt(active.id.replace('pill-','')));
+}
 function sortField(col) {
-  if (fieldSort.col === col) fieldSort.dir *= -1;
-  else { fieldSort.col = col; fieldSort.dir = col === 'owgr' ? 1 : -1; }
+  if (fieldSort.col === col) {
+    fieldSort.dir *= -1;
+  } else {
+    fieldSort.col = col;
+    // owgr/name default ascending, player counts default descending (most picked first)
+    fieldSort.dir = (col === 'owgr' || col === 'name') ? 1 : -1;
+  }
   renderFieldTable();
 }
 
