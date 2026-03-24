@@ -2044,17 +2044,11 @@ function renderFieldTable() {
   // Count selections across all weeks: current pending picks + all locked weeks
   const sel = {};
   function addSelCount(golferName, playerName) {
-    // Register under original key AND "First Last" variant
-    const keys = [golferName];
-    if (golferName.includes(',')) {
-      const pts = golferName.split(',');
-      keys.push(pts[1].trim() + ' ' + pts[0].trim());
-    }
-    keys.forEach(k => {
-      if (!sel[k]) sel[k] = { total: 0, byPlayer: {} };
-      sel[k].total++;
-      sel[k].byPlayer[playerName] = (sel[k].byPlayer[playerName] || 0) + 1;
-    });
+    // Normalise to a single canonical key so "J.J. Spaun" and "Spaun, J.J." always merge
+    const k = normName(golferName);
+    if (!sel[k]) sel[k] = { total: 0, byPlayer: {} };
+    sel[k].total++;
+    sel[k].byPlayer[playerName] = (sel[k].byPlayer[playerName] || 0) + 1;
   }
   // Current (unlocked) picks
   state.players.forEach(p => {
@@ -2119,15 +2113,11 @@ function renderFieldTable() {
   let rows = playerSource.map(p => ({
     owgr: p.owgr_rank, name: p.player_name,
     total: (() => {
-      const s = sel[p.player_name] || sel[p.player_name.split(',').length > 1
-        ? p.player_name.split(',')[1].trim() + ' ' + p.player_name.split(',')[0].trim()
-        : ''] || {};
+      const s = sel[normName(p.player_name)] || {};
       return s.total || 0;
     })(),
     byPlayer: (() => {
-      const s = sel[p.player_name] || sel[p.player_name.split(',').length > 1
-        ? p.player_name.split(',')[1].trim() + ' ' + p.player_name.split(',')[0].trim()
-        : ''] || {};
+      const s = sel[normName(p.player_name)] || {};
       return s.byPlayer || {};
     })(),
   }));
