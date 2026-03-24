@@ -444,14 +444,15 @@
   <!-- ══ FIELD TAB ══ -->
   <div id="tab-field" style="display:none;">
     <div class="card">
-      <div class="card-title">OWGR &amp; Selection Counts</div>
-      <div class="alert alert-info" id="fieldUploadHint">
-        Upload a player list CSV in <strong>Admin → Player List CSV</strong>.<br>
-        Required columns: <code>owgr_rank</code>, <code>player_name</code> (format: <code>Last, First</code>).
+      <div class="card-title">
+        <span>Players</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" id="fieldToggleField" onclick="setFieldView('field')">This Week</button>
+          <button class="btn-ghost btn-sm" id="fieldToggleAll" onclick="setFieldView('all')">All</button>
+        </div>
       </div>
-      <div class="flex" style="margin-bottom:10px;gap:6px;flex-wrap:wrap;">
-        <button class="btn btn-sm" id="fieldToggleField" onclick="setFieldView('field')" style="opacity:1;">This Week's Field</button>
-        <button class="btn-ghost btn-sm" id="fieldToggleAll" onclick="setFieldView('all')">All Players</button>
+      <div class="alert alert-info" id="fieldUploadHint">
+        Upload a field file in <strong>Admin → Upload Field File</strong>.
       </div>
       <div class="flex" style="margin-bottom:13px;">
         <input type="text" id="fieldSearch" placeholder="Search player..." oninput="renderFieldTable()" style="max-width:260px;" />
