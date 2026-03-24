@@ -538,24 +538,27 @@
       </div>
     </div>
 
-    <!-- Player List CSV -->
+    <!-- Field / Player List upload -->
     <div class="card">
-      <div class="card-title">Upload Player List CSV (OWGR)</div>
+      <div class="card-title">Upload Field File</div>
       <p class="text-small text-muted" style="margin-bottom:11px;">
-        Required: <code>owgr_rank</code>, <code>player_name</code> (<code>Last, First</code> format). Persists across sessions.
+        Accepts the pipe-delimited field file (<code>event_name|player_name|owgr_rank|current_round…</code>)
+        or the old OWGR CSV (<code>owgr_rank,player_name</code>). Automatically sets tournament name from <code>event_name</code>.
+        Persists across sessions.
       </p>
       <div class="file-upload-area" id="playerListDropZone"
            onclick="document.getElementById('playerListFileInput').click()"
            ondragover="event.preventDefault();this.classList.add('drag-over')"
            ondragleave="this.classList.remove('drag-over')"
            ondrop="handleDrop(event,'playerList')">
-        <input type="file" id="playerListFileInput" accept=".csv" onchange="handlePlayerListFile(this.files[0])" />
-        <div id="playerListDropLabel">📄 Click or drag &amp; drop player list CSV here</div>
+        <input type="file" id="playerListFileInput" accept=".csv,.txt" onchange="handlePlayerListFile(this.files[0])" />
+        <div id="playerListDropLabel">📄 Click or drag &amp; drop field file here</div>
       </div>
       <div id="playerListPreview" style="margin-top:11px;"></div>
+      <div id="fieldUploadHint" style="display:none;"></div>
       <div class="flex mt-16">
-        <button class="btn" onclick="loadPlayerList()">Load Player List</button>
-        <button class="btn-ghost" onclick="clearPlayerList()">Clear Player List</button>
+        <button class="btn" onclick="loadPlayerList()">Load Field</button>
+        <button class="btn-ghost" onclick="clearPlayerList()">Clear</button>
       </div>
     </div>
 
@@ -1054,26 +1057,71 @@ function scoreClass(n, isMC) {
 async function handlePlayerListFile(file) {
   if (!file) return;
   const text = await readFile(file);
-  const rows = parseCsv(text);
-  if (!rows.length) { toast('CSV empty','warn'); return; }
-  const norm = rows.map(r => { const n={}; Object.entries(r).forEach(([k,v])=>{n[k.toLowerCase()]=v;}); return n; });
-  const miss = ['owgr_rank','player_name'].filter(c => !(c in norm[0]));
-  if (miss.length) { toast('Missing: ' + miss.join(', '), 'error'); return; }
-  pendingPlayerCsv = norm;
+
+  // Detect pipe-delimited field file vs comma CSV
+  const firstLine = text.trim().split(/\r?\n/)[0];
+  const isPipe = firstLine.includes('|');
+
+  let rows;
+  if (isPipe) {
+    // Parse pipe-delimited
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split('|').map(h => h.trim().toLowerCase());
+    rows = lines.slice(1).filter(l => l.trim()).map(line => {
+      const cols = line.split('|');
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (cols[i] || '').trim(); });
+      return obj;
+    });
+  } else {
+    const parsed = parseCsv(text);
+    rows = parsed.map(r => { const n={}; Object.entries(r).forEach(([k,v])=>{n[k.toLowerCase()]=v;}); return n; });
+  }
+
+  if (!rows.length) { toast('File empty or unreadable','warn'); return; }
+
+  // Validate player_name exists
+  if (!('player_name' in rows[0])) { toast('Missing player_name column', 'error'); return; }
+
+  // Extract event name and round from field file if available
+  const eventName = rows[0].event_name ? rows[0].event_name.trim() : null;
+  const currentRound = rows[0].current_round ? rows[0].current_round.trim() : null;
+
+  pendingPlayerCsv = rows;
+  pendingPlayerCsv._eventName = eventName;
+  pendingPlayerCsv._currentRound = currentRound;
+
   document.getElementById('playerListDropZone').classList.add('file-loaded');
-  document.getElementById('playerListDropLabel').textContent = '✓ ' + file.name + ' (' + norm.length + ' players)';
-  document.getElementById('playerListPreview').innerHTML = '<p class="text-small text-muted">Ready — ' + norm.length + ' players to load.</p>';
+  document.getElementById('playerListDropLabel').textContent = '✓ ' + file.name + ' (' + rows.length + ' players)';
+
+  let previewHtml = '<p class="text-small text-muted">Ready — ' + rows.length + ' players.';
+  if (eventName) previewHtml += ' Event: <strong>' + escH(eventName) + '</strong>.';
+  if (currentRound) previewHtml += ' Round: <strong>' + escH(currentRound) + '</strong>.';
+  previewHtml += '</p>';
+  document.getElementById('playerListPreview').innerHTML = previewHtml;
 }
 function loadPlayerList() {
-  if (!pendingPlayerCsv) { toast('Upload a CSV first','warn'); return; }
+  if (!pendingPlayerCsv) { toast('Upload a file first','warn'); return; }
   state.playerList = pendingPlayerCsv
-    .map(r => ({ owgr_rank: parseInt(r.owgr_rank,10)||9999, player_name: r.player_name.trim() }))
+    .map(r => ({
+      owgr_rank: parseInt(r.owgr_rank||r.dg_rank||'9999', 10) || 9999,
+      player_name: r.player_name.trim()
+    }))
     .filter(r => r.player_name)
     .sort((a,b) => a.owgr_rank - b.owgr_rank);
+
+  // Auto-set tournament name from event_name if not already set
+  if (pendingPlayerCsv._eventName && !state.currentTournName) {
+    state.currentTournName = pendingPlayerCsv._eventName;
+    const inp = document.getElementById('uploadTournName');
+    if (inp) inp.value = pendingPlayerCsv._eventName;
+  }
+
   saveState();
-  document.getElementById('fieldUploadHint').style.display = 'none';
   renderFieldTable();
-  toast('Player list loaded — ' + state.playerList.length + ' players','success');
+  const msg = 'Field loaded — ' + state.playerList.length + ' players' +
+    (pendingPlayerCsv._eventName ? ' · ' + pendingPlayerCsv._eventName : '');
+  toast(msg, 'success');
 }
 function clearPlayerList() {
   state.playerList = []; pendingPlayerCsv = null; saveState();
@@ -1088,11 +1136,12 @@ function updateBanner() {
   const cs = state.currentScores;
   const hasScores = !!cs;
 
-  // Hide banner and leaderboard card when no scores loaded (pre-tournament / self-entry phase)
+  // Hide banner and leaderboard when picks are open (self-entry phase) AND no scores loaded
+  const hideForSelfEntry = !hasScores && state.picksOpen;
   const banner = document.getElementById('tournBanner');
   const lbCard = document.getElementById('lbCard');
-  if (banner) banner.style.display = hasScores ? '' : 'none';
-  if (lbCard) lbCard.style.display = hasScores ? '' : 'none';
+  if (banner) banner.style.display = hideForSelfEntry ? 'none' : '';
+  if (lbCard) lbCard.style.display = hideForSelfEntry ? 'none' : '';
 
   if (cs) {
     document.getElementById('tournName').textContent = cs.tournName + (cs.isMajor ? ' ⭐' : '');
