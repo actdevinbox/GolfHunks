@@ -640,9 +640,16 @@
     <div class="card">
       <div class="card-title">Lock Week Results</div>
       <p class="text-small text-muted" style="margin-bottom:11px;">
-        Review calculated results below, then lock to permanently record Week <span id="lockWeekNum">1</span>'s scores and money.
+        Review calculated results below, then lock to permanently record the week's scores and money.
+        To re-lock a prior week: remove it first, reload picks &amp; scores for that week, select it below, then lock.
         <strong style="color:var(--gold);">This stores the full pick-by-pick breakdown for the history tab.</strong>
       </p>
+      <div class="form-row" style="margin-bottom:13px;">
+        <label>Lock into week</label>
+        <select id="lockWeekSelect" style="max-width:220px;" onchange="updateLockWeekLabel()">
+          <option value="current">Current (Week <span id="lockWeekNum">1</span>)</option>
+        </select>
+      </div>
       <div id="admin-week-scores"><div class="empty">Upload picks and scores CSVs to see results here.</div></div>
       <div class="mt-16">
         <button class="btn" onclick="lockCurrentWeek()">🔒 Lock Week <span id="lockWeekNum2">1</span></button>
@@ -1929,12 +1936,21 @@ function renderAdminWeekScores() {
 
 function lockCurrentWeek() {
   if (!state.currentScores) { toast('Load scores first', 'warn'); return; }
-  const results = calcWeekResults(state.currentWeek);
-  if (!results || !results.length) { toast('No picks to lock', 'warn'); return; }
+
+  // Determine which week to lock — current or a selected prior week
+  const lkSel = document.getElementById('lockWeekSelect');
+  const wk = (lkSel && lkSel.value !== 'current') ? parseInt(lkSel.value, 10) : state.currentWeek;
+
+  // For prior weeks, temporarily use that week's picks if they exist
+  const targetPicks = state.picks[wk] || {};
+  const hasTargetPicks = Object.keys(targetPicks).length > 0;
+  if (!hasTargetPicks) { toast('No picks loaded for Week ' + wk, 'warn'); return; }
+
+  const results = calcWeekResults(wk);
+  if (!results || !results.length) { toast('No picks to lock for Week ' + wk, 'warn'); return; }
 
   const rows = state.currentScores.rows;
   const mcScore = calcMcPenalty(rows);
-  const wk = state.currentWeek;
 
   // Store full detail (fix #6) — including pick-by-pick scores and tournament name
   // Find the actual tournament winner: player listed at position 1 in the CSV.
@@ -1971,12 +1987,16 @@ function lockCurrentWeek() {
     }))
   };
 
-  // Clear current week's picks and scores, advance week
+  // Clear locked week's picks
   delete state.picks[wk];
-  state.currentWeek = wk + 1;
-  state.currentScores = null;
-  state.currentTournName = '';
-  state.currentRound = '';
+  // Only advance the current week pointer if we just locked the current week
+  if (wk === state.currentWeek) {
+    state.currentWeek = wk + 1;
+    state.currentScores = null;
+    state.currentTournName = '';
+    state.currentRound = '';
+  }
+  // If locking a prior week, keep scores loaded (might need to lock another)
   saveState();
   renderAll();
   toast('Week ' + wk + ' locked! Now on week ' + state.currentWeek + '.', 'success');
@@ -2189,6 +2209,16 @@ function removeLockedWeek() {
   toast('Week ' + wk + ' removed.', 'warn');
 }
 
+function updateLockWeekLabel() {
+  const sel = document.getElementById('lockWeekSelect');
+  if (!sel) return;
+  const wk = sel.value === 'current' ? state.currentWeek : parseInt(sel.value, 10);
+  ['lockWeekNum','lockWeekNum2'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = wk;
+  });
+}
+
 function updateAdminWeekSelectors() {
   const lockedWks = Object.keys(state.lockedWeeks).map(Number).sort((a,b) => a-b);
   const wk = state.currentWeek;
@@ -2216,6 +2246,19 @@ function updateAdminWeekSelectors() {
   }
   const sSpan = document.getElementById('scoresWeekCurrent');
   if (sSpan) sSpan.textContent = wk;
+
+  // Lock week selector — current + any past unlocked weeks
+  const lkSel = document.getElementById('lockWeekSelect');
+  if (lkSel) {
+    const prev = lkSel.value;
+    lkSel.innerHTML = '<option value="current">Current (Week ' + wk + ')</option>';
+    for (let i = 1; i < wk; i++) {
+      if (!state.lockedWeeks[i]) {
+        lkSel.innerHTML += '<option value="' + i + '"' + (prev == i ? ' selected' : '') + '>Week ' + i + ' (unlocked)</option>';
+      }
+    }
+    updateLockWeekLabel();
+  }
 
   // Remove week selector
   const rSel = document.getElementById('removeWeekSelect');
@@ -2849,7 +2892,8 @@ function renderAll() {
   document.getElementById('highPrize').value   = s.highPrize;
   const apEl = document.getElementById('adminPinInput');
   if (apEl) apEl.placeholder = s.adminPin ? '••••  (set — enter new to change)' : '4 digits';
-  ['lockWeekNum','lockWeekNum2'].forEach(id => document.getElementById(id).textContent = state.currentWeek);
+  ['lockWeekNum2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = state.currentWeek; });
+  updateLockWeekLabel();
 
   // Always show GolfHunks branding regardless of stored leagueName
   document.querySelector('header h1').innerHTML = '⛳ GolfHunks';
