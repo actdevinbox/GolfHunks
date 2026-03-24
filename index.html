@@ -502,6 +502,17 @@
         <label>Tournament Name (overrides tournament from picks CSV)</label>
         <input type="text" id="uploadTournName" placeholder="e.g. The Masters 2025" />
       </div>
+      <div class="form-row">
+        <label>Round</label>
+        <select id="uploadRound" style="max-width:160px;">
+          <option value="">— select —</option>
+          <option value="Pre">Pre-Tournament</option>
+          <option value="R1">Round 1</option>
+          <option value="R2">Round 2</option>
+          <option value="R3">Round 3</option>
+          <option value="Final">Final</option>
+        </select>
+      </div>
       <div class="form-row" style="display:flex;align-items:center;gap:10px;">
         <input type="checkbox" id="isMajor" style="width:auto;" />
         <label style="margin-bottom:0;color:var(--gold);">⭐ This is a Major (all scores doubled)</label>
@@ -706,6 +717,7 @@ function defaultState() {
     lockedWeeks: {},
     playerList: [],
     pickDeadline: null,   // ISO string (UTC) of when picks lock
+    currentRound: '',     // 'Pre','R1','R2','R3','Final'
     picksOpen: false,     // admin toggle: allows competitor self-entry
     auditLog: [],         // [{ts, competitorName, week, prev, next, changedBy}]
   };
@@ -719,6 +731,7 @@ function mergeState(remote) {
     auditLog: remote.auditLog || [],
     picksOpen: remote.picksOpen || false,
     pickDeadline: remote.pickDeadline || null,
+    currentRound: remote.currentRound || '',
     // Ensure players always have pin field
     players: (remote.players||[]).map(function(p) {
       return { id: p.id, name: p.name, pin: p.pin || '' };
@@ -998,6 +1011,8 @@ function loadScores() {
   }).filter(r => r.name);
 
   const isMajor = document.getElementById('isMajor')?.checked || false;
+  const roundSel = document.getElementById('uploadRound');
+  state.currentRound = (roundSel && roundSel.value) ? roundSel.value : '';
   state.currentScores = { tournName, rows, loadedAt: new Date().toLocaleString(), isMajor };
   state.currentTournName = tournName;
   saveState();
@@ -1006,7 +1021,7 @@ function loadScores() {
 }
 
 function clearScores() {
-  state.currentScores = null; pendingScoreCsv = null; saveState();
+  state.currentScores = null; state.currentRound = ''; pendingScoreCsv = null; saveState();
   document.getElementById('scoreDropZone').classList.remove('file-loaded');
   document.getElementById('scoreDropLabel').textContent = '📄 Click or drag & drop scores CSV here';
   document.getElementById('scorePreview').innerHTML = '';
@@ -1066,9 +1081,10 @@ function updateBanner() {
   const cs = state.currentScores;
   if (cs) {
     document.getElementById('tournName').textContent = cs.tournName + (cs.isMajor ? ' ⭐' : '');
-    document.getElementById('tournSub').textContent = cs.rows.length + ' players · Loaded ' + cs.loadedAt;
+    const roundLabel = state.currentRound ? ' · ' + state.currentRound : '';
+    document.getElementById('tournSub').textContent = cs.rows.length + ' players · Loaded ' + cs.loadedAt + roundLabel;
     const s = document.getElementById('tournStatus');
-    s.textContent = '✓ Scores Loaded'; s.className = 'status-pill status-loaded';
+    s.textContent = state.currentRound ? state.currentRound : '✓ Loaded'; s.className = 'status-pill status-loaded';
   } else {
     document.getElementById('tournName').textContent = state.currentTournName || 'No scores loaded';
     document.getElementById('tournSub').textContent = 'Upload a scores CSV in the Admin tab';
@@ -1123,7 +1139,7 @@ function renderLeaderboardTable() {
   if (lbQ) rows = rows.filter(r => r.name.toLowerCase().includes(lbQ));
   const total = rows.length;
   if (!lbShowAll && !lbQ) rows = rows.slice(0, 10);
-  const hasSG = state.currentScores.rows.some(r => r.sg_total !== null);
+
 
   // Build competitor pick sets for current week
   const wk = state.currentWeek;
@@ -1171,7 +1187,7 @@ function renderLeaderboardTable() {
   let h = '<div class="scroll-table-wrap" style="max-height:' + (lbShowAll ? '600px' : '340px') + '">';
   h += '<table class="data-table"><thead><tr>';
   h += '<th>Pos</th><th>Player</th><th class="r">Score</th><th class="r">Today</th><th>Thru</th>';
-  if (hasSG) h += '<th class="r hide-md">SG:Putt</th><th class="r hide-md">SG:App</th><th class="r hide-md">SG:OTT</th><th class="r hide-md">SG:Tot</th>';
+  // SG columns removed
   // Competitor columns — one per person with picks
   competitors.forEach(p => {
     const isMe = p.id === meId();
@@ -1191,13 +1207,7 @@ function renderLeaderboardTable() {
       '<td class="r ' + scoreClass(r.today) + '" style="font-family:var(--mono)">' + r.todayDisplay + '</td>' +
       '<td class="text-small text-muted">' + (r.thru || '—') + '</td>';
 
-    if (hasSG) {
-      const sg = v => v !== null ? v.toFixed(2) : '—';
-      h += '<td class="r sg-col hide-md">' + sg(r.sg_putt) + '</td>' +
-           '<td class="r sg-col hide-md">' + sg(r.sg_app)  + '</td>' +
-           '<td class="r sg-col hide-md">' + sg(r.sg_ott)  + '</td>' +
-           '<td class="r sg-col hide-md">' + sg(r.sg_total) + '</td>';
-    }
+    // SG columns removed
 
     // Competitor pick check columns — try multiple name variants
     const golferRaw = r.name.trim();
@@ -1329,15 +1339,22 @@ function calcWeekResults(wk) {
 
   if (!results.length) return null;
 
-  // Determine best (lowest = best golf score) and worst (highest = worst)
+  // Determine best/worst with tie splitting
   const withScores = results.filter(r => r.total !== null);
   if (withScores.length > 1) {
     const scores = withScores.map(r => r.total);
-    const bestScore  = Math.min(...scores);   // lowest = best player → WINS prize
-    const worstScore = Math.max(...scores);   // highest = worst player → pays penalty
+    const bestScore  = Math.min(...scores);
+    const worstScore = Math.max(...scores);
+    const bestCount  = scores.filter(s => s === bestScore).length;
+    const worstCount = scores.filter(s => s === worstScore).length;
+    // Split prize/penalty evenly across tied players, rounded to 2dp
+    const splitPrize   = Math.round((state.settings.highPrize  / bestCount)  * 100) / 100;
+    const splitPenalty = Math.round((state.settings.lowPenalty / worstCount) * 100) / 100;
     results.forEach(r => {
-      r.isBest  = r.total === bestScore;   // best player WINS
-      r.isWorst = r.total === worstScore;  // worst player OWES
+      r.isBest  = r.total === bestScore;
+      r.isWorst = r.total === worstScore;
+      r.splitPrize   = r.isBest  ? splitPrize   : 0;
+      r.splitPenalty = r.isWorst ? splitPenalty : 0;
     });
   }
 
@@ -1415,7 +1432,14 @@ function computePlayerStats() {
   Object.values(state.lockedWeeks).forEach(function(lw) {
     // tournWinner is stored at lock time (the golfer with the lowest score in the full field)
     // For legacy locked weeks without tournWinner, fall back to null (no credit given)
-    var winner = lw.tournWinner ? lw.tournWinner.toLowerCase().trim() : null;
+    // Support both legacy single tournWinner and new tournWinners array
+    var winners = [];
+    if (lw.tournWinners && lw.tournWinners.length) {
+      winners = lw.tournWinners.map(function(w){ return w.toLowerCase().trim(); });
+    } else if (lw.tournWinner) {
+      winners = [lw.tournWinner.toLowerCase().trim()];
+    }
+    var winCredit = winners.length > 0 ? 1 / winners.length : 0; // fractional credit per winner
 
     lw.results.forEach(function(r) {
       ensureStat(r.playerId, r.playerName);
@@ -1425,19 +1449,22 @@ function computePlayerStats() {
         st.totalPicks++;
         if (!pd.mc && !pd.notFound) st.madeCutPicks++;
         if (pd.notFound) return; // can't win with a player not in the field
-        // Win pick: this pick matches the stored tournament winner name (fuzzy)
-        if (winner && pd.name) {
+        // Win pick: check against all tied winners, award fractional credit
+        if (winners.length && pd.name && winCredit > 0) {
           var pn = pd.name.toLowerCase().trim();
-          var matched = pn === winner;
-          if (!matched && winner.includes(',')) {
-            var pts = winner.split(',');
-            matched = pn === (pts[1].trim() + ' ' + pts[0].trim()).toLowerCase();
-          }
-          if (!matched && pn.includes(',')) {
-            var pts2 = pn.split(',');
-            matched = (pts2[1].trim() + ' ' + pts2[0].trim()).toLowerCase() === winner;
-          }
-          if (matched) st.winPicks++;
+          var matched = winners.some(function(winner) {
+            if (pn === winner) return true;
+            if (winner.includes(',')) {
+              var pts = winner.split(',');
+              if (pn === (pts[1].trim() + ' ' + pts[0].trim()).toLowerCase()) return true;
+            }
+            if (pn.includes(',')) {
+              var pts2 = pn.split(',');
+              if ((pts2[1].trim() + ' ' + pts2[0].trim()).toLowerCase() === winner) return true;
+            }
+            return false;
+          });
+          if (matched) st.winPicks = Math.round((st.winPicks + winCredit) * 10) / 10;
         }
       });
     });
@@ -1491,8 +1518,8 @@ function renderLiveStandings() {
       const pd = playerData[r.playerId];
       pd.lockedTotal += (r.total || 0);
       pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, live: false };
-      if (r.isBest)  pd.balance += lw.settings.highPrize;
-      if (r.isWorst) pd.balance -= lw.settings.lowPenalty;
+      if (r.isBest)  pd.balance += (r.splitPrize   || lw.settings.highPrize);
+      if (r.isWorst) pd.balance -= (r.splitPenalty || lw.settings.lowPenalty);
     });
   });
 
@@ -1503,8 +1530,8 @@ function renderLiveStandings() {
       const pd = playerData[r.player.id];
       pd.liveTotal = r.total;
       pd.weeks[state.currentWeek] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, live: true };
-      if (r.isBest)  pd.balance += state.settings.highPrize;
-      if (r.isWorst) pd.balance -= state.settings.lowPenalty;
+      if (r.isBest)  pd.balance += (r.splitPrize   || state.settings.highPrize);
+      if (r.isWorst) pd.balance -= (r.splitPenalty || state.settings.lowPenalty);
     });
   }
 
@@ -1599,8 +1626,8 @@ function renderCumulativeStandings() {
       const pd = playerData[r.playerId];
       pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, rank: weekRanks[wk][r.playerId] };
       pd.total += (r.total || 0);
-      if (r.isBest)  { pd.balance += state.settings.highPrize;  pd.bestCount++; }
-      if (r.isWorst) { pd.balance -= state.settings.lowPenalty; pd.worstCount++; }
+      if (r.isBest)  { pd.balance += (r.splitPrize   || state.settings.highPrize);  pd.bestCount++; }
+      if (r.isWorst) { pd.balance -= (r.splitPenalty || state.settings.lowPenalty); pd.worstCount++; }
     });
   });
 
@@ -1649,7 +1676,7 @@ function renderCumulativeStandings() {
 
     // stat cells — before weekly columns
     const cSt = pStats2[r._id];
-    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? cSt.winPicks : '—') + '</td>';
+    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? (Number.isInteger(cSt.winPicks) ? cSt.winPicks : cSt.winPicks.toFixed(1)) : '—') + '</td>';
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt && cSt.madeCutPct !== null ? cSt.madeCutPct + '%' : '—') + '</td>';
 
     wksDesc.forEach(wk => {
@@ -1682,8 +1709,8 @@ function renderMoneyTable() {
   const rows = [];
   Object.entries(state.lockedWeeks).forEach(([wk, lw]) => {
     lw.results.forEach(r => {
-      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🏆 Best score prize', amt: state.settings.highPrize, tourn: lw.tournName });
-      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score penalty', amt: -state.settings.lowPenalty, tourn: lw.tournName });
+      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🥇 Best score prize' + (r.splitPrize && r.splitPrize !== lw.settings.highPrize ? ' (split)' : ''), amt: (r.splitPrize || lw.settings.highPrize), tourn: lw.tournName });
+      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score penalty' + (r.splitPenalty && r.splitPenalty !== lw.settings.lowPenalty ? ' (split)' : ''), amt: -(r.splitPenalty || lw.settings.lowPenalty), tourn: lw.tournName });
     });
   });
   if (!rows.length) { el.innerHTML = '<div class="empty">No locked weeks yet.</div>'; return; }
@@ -1914,16 +1941,20 @@ function lockCurrentWeek() {
   // In a playoff, the winner has posNum===1 while others have posNum===2 at same score.
   // First try posNum===1 exactly; if not found (e.g. all tied T1), fall back to lowest score.
   const nonMC = state.currentScores.rows.filter(function(rr) { return !rr.isMC; });
-  let winnerRow = nonMC.find(function(rr) { return rr.posNum === 1 && !rr.isTied; });
-  if (!winnerRow) {
-    // fallback: lowest posNum wins (handles T1 or missing position data)
-    winnerRow = nonMC.slice().sort(function(a, b) { return a.posNum - b.posNum || a.score - b.score; })[0];
+  // Find winner(s): solo posNum===1, or all T1 tied players
+  let winnerRows = nonMC.filter(function(rr) { return rr.posNum === 1 && !rr.isTied; });
+  if (!winnerRows.length) {
+    // Tied or no explicit solo winner — take all at posNum===1
+    const minPos = Math.min.apply(null, nonMC.map(function(rr){ return rr.posNum; }));
+    winnerRows = nonMC.filter(function(rr) { return rr.posNum === minPos; });
   }
-  const tournWinner = winnerRow ? winnerRow.name : null;
+  const tournWinner  = winnerRows.length === 1 ? winnerRows[0].name : null; // legacy single
+  const tournWinners = winnerRows.map(function(rr){ return rr.name; });     // array for fractional
 
   state.lockedWeeks[wk] = {
     tournName: state.currentTournName || state.currentScores.tournName,
     tournWinner: tournWinner,
+    tournWinners: tournWinners,
     lockedAt: new Date().toLocaleString(),
     mcScore,
     settings: { lowPenalty: state.settings.lowPenalty, highPrize: state.settings.highPrize },
@@ -1935,6 +1966,8 @@ function lockCurrentWeek() {
       total: r.total,
       isBest: r.isBest || false,
       isWorst: r.isWorst || false,
+      splitPrize: r.splitPrize || 0,
+      splitPenalty: r.splitPenalty || 0,
     }))
   };
 
@@ -1943,6 +1976,7 @@ function lockCurrentWeek() {
   state.currentWeek = wk + 1;
   state.currentScores = null;
   state.currentTournName = '';
+  state.currentRound = '';
   saveState();
   renderAll();
   toast('Week ' + wk + ' locked! Now on week ' + state.currentWeek + '.', 'success');
