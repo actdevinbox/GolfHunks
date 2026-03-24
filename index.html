@@ -542,6 +542,28 @@
       </div>
     </div>
 
+    <!-- Full OWGR Rankings upload -->
+    <div class="card">
+      <div class="card-title">Upload Full OWGR Rankings</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
+        Full season-long rankings used for the <strong>All Players</strong> view on the Players tab.
+        Accepts <code>owgr_rank,player_name</code> CSV. Load once per season or whenever rankings update.
+      </p>
+      <div class="file-upload-area" id="owgrDropZone"
+           onclick="document.getElementById('owgrFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event,'owgr')">
+        <input type="file" id="owgrFileInput" accept=".csv,.txt" onchange="handleOwgrFile(this.files[0])" />
+        <div id="owgrDropLabel">📊 Click or drag &amp; drop OWGR CSV here</div>
+      </div>
+      <div id="owgrPreview" style="margin-top:8px;"></div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="loadOwgrList()">Load OWGR</button>
+        <button class="btn-ghost" onclick="clearOwgrList()">Clear</button>
+      </div>
+    </div>
+
     <!-- Field / Player List upload -->
     <div class="card">
       <div class="card-title">Upload Field File</div>
@@ -683,6 +705,14 @@
       <div id="winnerDebug" style="font-family:var(--mono);font-size:.74rem;"></div>
     </div>
 
+    <!-- State Debug -->
+    <div class="card">
+      <div class="card-title">🔍 State Debug</div>
+      <p class="text-small text-muted" style="margin-bottom:8px;">Shows key state values as currently loaded in memory and saved in Firestore.</p>
+      <div id="stateDebug" style="font-family:var(--mono);font-size:.7rem;line-height:1.8;"></div>
+      <button class="btn-ghost btn-sm" style="margin-top:8px;" onclick="renderStateDebug()">Refresh</button>
+    </div>
+
     <!-- Danger -->
     <div class="card">
       <div class="card-title">Danger Zone</div>
@@ -729,7 +759,8 @@ function defaultState() {
     picks: {},
     currentScores: null,
     lockedWeeks: {},
-    playerList: [],
+    playerList: [],   // current week field (for picks typeahead)
+    owgrList: [],     // full OWGR rankings (for Players tab 'All Players' view)
     pickDeadline: null,   // ISO string (UTC) of when picks lock
     currentRound: '',     // 'Pre','R1','R2','R3','Final'
     picksOpen: false,     // admin toggle: allows competitor self-entry
@@ -743,6 +774,7 @@ function mergeState(remote) {
     ...d, ...remote,
     settings: { ...d.settings, ...(remote.settings||{}) },
     auditLog: remote.auditLog || [],
+    owgrList: remote.owgrList || [],
     picksOpen: remote.picksOpen || false,
     pickDeadline: remote.pickDeadline || null,
     currentRound: remote.currentRound || '',
@@ -838,6 +870,7 @@ function handleDrop(e, type) {
   if (!file) return;
   if (type === 'score') handleScoreFile(file);
   else if (type === 'picks') handlePicksFile(file);
+  else if (type === 'owgr') handleOwgrFile(file);
   else handlePlayerListFile(file);
 }
 
@@ -1104,6 +1137,52 @@ async function handlePlayerListFile(file) {
   previewHtml += '</p>';
   document.getElementById('playerListPreview').innerHTML = previewHtml;
 }
+let pendingOwgrCsv = null;
+
+async function handleOwgrFile(file) {
+  if (!file) return;
+  const text = await readFile(file);
+  const firstLine = text.trim().split(/\r?\n/)[0];
+  const isPipe = firstLine.includes('|');
+  let rows;
+  if (isPipe) {
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split('|').map(h => h.trim().toLowerCase());
+    rows = lines.slice(1).filter(l => l.trim()).map(line => {
+      const cols = line.split('|');
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (cols[i] || '').trim(); });
+      return obj;
+    });
+  } else {
+    rows = parseCsv(text).map(r => { const n={}; Object.entries(r).forEach(([k,v])=>{n[k.toLowerCase()]=v;}); return n; });
+  }
+  if (!rows.length || !('player_name' in rows[0])) { toast('Missing player_name column', 'error'); return; }
+  pendingOwgrCsv = rows;
+  document.getElementById('owgrDropZone').classList.add('file-loaded');
+  document.getElementById('owgrDropLabel').textContent = '✓ ' + file.name + ' (' + rows.length + ' players)';
+  document.getElementById('owgrPreview').innerHTML = '<p class="text-small text-muted">Ready — ' + rows.length + ' players.</p>';
+}
+
+function loadOwgrList() {
+  if (!pendingOwgrCsv) { toast('Upload a file first', 'warn'); return; }
+  state.owgrList = pendingOwgrCsv
+    .map(r => ({ owgr_rank: parseInt(r.owgr_rank||r.dg_rank||'9999',10)||9999, player_name: r.player_name.trim() }))
+    .filter(r => r.player_name)
+    .sort((a,b) => a.owgr_rank - b.owgr_rank);
+  saveState();
+  renderFieldTable();
+  toast('OWGR rankings loaded — ' + state.owgrList.length + ' players', 'success');
+}
+
+function clearOwgrList() {
+  state.owgrList = []; pendingOwgrCsv = null; saveState();
+  document.getElementById('owgrDropZone').classList.remove('file-loaded');
+  document.getElementById('owgrDropLabel').textContent = '📊 Click or drag & drop OWGR CSV here';
+  document.getElementById('owgrPreview').innerHTML = '';
+  renderFieldTable(); toast('OWGR rankings cleared', 'warn');
+}
+
 function loadPlayerList() {
   if (!pendingPlayerCsv) { toast('Upload a file first','warn'); return; }
   state.playerList = pendingPlayerCsv
@@ -1127,6 +1206,9 @@ function loadPlayerList() {
 
   saveState();
   renderFieldTable();
+  updateBanner();
+  renderLeaderboardTable();
+  renderWeeklyFantasyScores();
   const msg = 'Field loaded — ' + state.playerList.length + ' players' +
     (pendingPlayerCsv._eventName ? ' · ' + pendingPlayerCsv._eventName : '');
   toast(msg, 'success');
@@ -1932,8 +2014,9 @@ function renderFieldTable() {
         r.picks.forEach(g => { allNames[g] = allNames[g] || { owgr_rank: 9999, player_name: g }; });
       });
     });
-    // Also include current playerList entries so OWGR ranks are correct
-    state.playerList.forEach(p => { allNames[p.player_name] = p; });
+    // Merge with owgrList (full rankings) for OWGR data, then playerList
+    const rankSource = state.owgrList.length ? state.owgrList : state.playerList;
+    rankSource.forEach(p => { allNames[p.player_name] = p; });
     playerSource = Object.values(allNames);
   } else {
     playerSource = state.playerList;
@@ -2116,6 +2199,28 @@ function winnerNameMatches(pickName, winnerName) {
     if ((pts2[1].trim() + ' ' + pts2[0].trim()).toLowerCase() === wn) return true;
   }
   return false;
+}
+
+function renderStateDebug() {
+  const el = document.getElementById('stateDebug');
+  if (!el) return;
+  const rows = [
+    ['currentWeek',       state.currentWeek],
+    ['currentTournName',  state.currentTournName || '(empty)'],
+    ['currentRound',      state.currentRound || '(empty)'],
+    ['currentScores',     state.currentScores ? state.currentScores.tournName + ' (' + (state.currentScores.rows||[]).length + ' rows)' : 'null'],
+    ['picksOpen',         state.picksOpen],
+    ['pickDeadline',      state.pickDeadline || 'null'],
+    ['playerList.length', state.playerList.length],
+    ['owgrList.length',   (state.owgrList||[]).length],
+    ['players.length',    state.players.length],
+    ['lockedWeeks',       Object.keys(state.lockedWeeks).join(', ') || '(none)'],
+    ['auditLog.length',   (state.auditLog||[]).length],
+  ];
+  el.innerHTML = rows.map(function(r) {
+    return '<div><span style="color:var(--text-muted);display:inline-block;width:180px;">' + r[0] + '</span>' +
+      '<strong>' + escH(String(r[1])) + '</strong></div>';
+  }).join('');
 }
 
 function renderWinnerDebug() {
@@ -2972,7 +3077,7 @@ function showTab(tab) {
       document.getElementById('picksEntryCard').style.display = 'none';
     }
   }
-  if (tab === 'admin')    { renderWinnerDebug(); renderSubmissionStatus(); renderAuditLog(); renderDeadlineStatus(); }
+  if (tab === 'admin')    { renderWinnerDebug(); renderSubmissionStatus(); renderAuditLog(); renderDeadlineStatus(); renderStateDebug(); }
 }
 
 function renderAll() {
