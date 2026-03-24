@@ -1845,8 +1845,7 @@ function renderCumulativeStandings() {
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
     '<th>#</th>' + mks('Competitor','name','') +
     mks('Balance','balance') + mks('Total','total') +
-    mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct') +
-    '<th></th>';
+    mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct');
   wksDesc.forEach(wk => {
     const lw = state.lockedWeeks[wk];
     const short = escH(lw.tournName).slice(0,14);
@@ -2087,10 +2086,32 @@ function renderFieldTable() {
         r.picks.forEach(g => { allNames[g] = allNames[g] || { owgr_rank: 9999, player_name: g }; });
       });
     });
-    // Merge with owgrList (full rankings) for OWGR data, then playerList
+    // Build a variant→canonical map from playerList + owgrList so picks in
+    // "First Last" format resolve to the correct ranked entry
     const rankSource = state.owgrList.length ? state.owgrList : state.playerList;
-    rankSource.forEach(p => { allNames[p.player_name] = p; });
-    playerSource = Object.values(allNames);
+    const canonMap = {}; // lowercase variant → canonical player object
+    rankSource.forEach(p => {
+      const n = p.player_name;
+      canonMap[n.toLowerCase()] = p;
+      // Also register First Last variant
+      if (n.includes(',')) {
+        const pts = n.split(',');
+        canonMap[(pts[1].trim() + ' ' + pts[0].trim()).toLowerCase()] = p;
+      }
+    });
+    // Resolve each pick name to its canonical entry, fall back to owgr 9999
+    Object.keys(allNames).forEach(function(pickName) {
+      const canonical = canonMap[pickName.toLowerCase()];
+      if (canonical) {
+        allNames[pickName] = canonical; // replace stub with real ranked entry
+      }
+    });
+    // Also add all ranked players even if not picked
+    rankSource.forEach(p => { if (!allNames[p.player_name]) allNames[p.player_name] = p; });
+    // Deduplicate by canonical player_name
+    const deduped = {};
+    Object.values(allNames).forEach(p => { deduped[p.player_name.toLowerCase()] = p; });
+    playerSource = Object.values(deduped);
   } else {
     playerSource = state.playerList;
   }
