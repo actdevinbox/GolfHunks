@@ -1261,6 +1261,62 @@ function fmtName(raw) {
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function meId() { return (_session && !_session.isAdmin) ? _session.id : null; }
 
+// Build a map of player.id -> display label with no conflicts.
+// All players start with standard initials (e.g. "JS").
+// If two players share initials, progressively add more letters from the
+// last name until all labels are unique (e.g. "JSm" vs "JSp").
+function disambiguateInitials(players) {
+  // Parse name into {first, last} parts
+  function parseName(name) {
+    if (!name) return { first: '', last: '' };
+    if (name.includes(',')) {
+      const pts = name.split(',');
+      return { last: pts[0].trim(), first: pts[1].trim() };
+    }
+    const pts = name.trim().split(/\s+/);
+    return { first: pts.slice(0, -1).join(' '), last: pts[pts.length - 1] };
+  }
+
+  // Generate label: first initial + last initial(s)
+  // extraLastChars = how many extra chars to show from last name (0 = just initial)
+  function makeLabel(name, extraLastChars) {
+    const { first, last } = parseName(name);
+    const fi = first ? first[0].toUpperCase() : '';
+    const li = last ? last.slice(0, 1 + extraLastChars).toUpperCase() : '';
+    return fi + li;
+  }
+
+  const ids   = players.map(p => p.id);
+  const names = players.map(p => p.name);
+  const labels = new Array(names.length);
+
+  // Start with 0 extra chars, keep expanding for conflicting labels
+  for (let extra = 0; extra <= 8; extra++) {
+    // Assign labels at this extra level for any still-unresolved players
+    names.forEach((name, i) => {
+      if (labels[i] === undefined) labels[i] = makeLabel(name, extra);
+    });
+
+    // Check for duplicates — find groups sharing the same label
+    const labelCount = {};
+    labels.forEach(l => { labelCount[l] = (labelCount[l] || 0) + 1; });
+
+    // Mark duplicates as undefined so they get expanded next iteration
+    if (extra < 8) {
+      labels.forEach((l, i) => {
+        if (labelCount[l] > 1) labels[i] = undefined;
+      });
+    }
+
+    // If no more duplicates, we're done
+    if (Object.values(labelCount).every(c => c === 1)) break;
+  }
+
+  const result = {};
+  ids.forEach((id, i) => { result[id] = labels[i] || names[i][0].toUpperCase(); });
+  return result;
+}
+
 // Normalise a golfer name to lowercase "last, first" for consistent key matching.
 // Handles both "First Last" and "Last, First" input formats.
 function normName(raw) {
@@ -1331,22 +1387,15 @@ function renderLeaderboardTable() {
     });
   });
 
-  // Helper: get initials from a name (e.g. "John Smith" -> "JS", "Smith, John" -> "JS")
-  function initials(name) {
-    const parts = name.includes(',')
-      ? name.split(',').map(s => s.trim()).reverse()  // "Last, First" -> ["First", "Last"]
-      : name.split(' ').map(s => s.trim());
-    return parts.filter(Boolean).map(s => s[0].toUpperCase()).join('');
-  }
+  const lbLabels = disambiguateInitials(competitors);
 
   let h = '<div class="scroll-table-wrap" style="max-height:' + (lbShowAll ? '600px' : '340px') + '">';
   h += '<table class="data-table"><thead><tr>';
   h += '<th>Pos</th><th>Player</th><th class="r">Score</th><th class="r">Today</th><th>Thru</th>';
-  // SG columns removed
   // Competitor columns — one per person with picks
   competitors.forEach(p => {
     const isMe = p.id === meId();
-    h += '<th class="c' + (isMe ? ' my-col-header' : '') + '" title="' + escH(p.name) + '" style="min-width:32px' + (isMe ? ';font-weight:700' : '') + '">' + escH(initials(p.name)) + (isMe ? ' ◀' : '') + '</th>';
+    h += '<th class="c' + (isMe ? ' my-col-header' : '') + '" title="' + escH(p.name) + '" style="min-width:32px' + (isMe ? ';font-weight:700' : '') + '">' + escH(lbLabels[p.id]) + (isMe ? ' ◀' : '') + '</th>';
   });
   h += '</tr></thead><tbody>';
 
@@ -1396,7 +1445,7 @@ function renderLeaderboardTable() {
   }
   if (competitors.length > 0) {
     h += '<p class="text-small text-muted" style="margin-top:6px;">Columns: ' +
-      competitors.map(p => escH(initials(p.name)) + ' = ' + escH(p.name)).join(' · ') + '</p>';
+      competitors.map(p => escH(lbLabels[p.id]) + ' = ' + escH(p.name)).join(' · ') + '</p>';
   }
   el.innerHTML = h;
 }
@@ -2145,22 +2194,15 @@ function renderFieldTable() {
 
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
     th('OWGR','owgr') + th('Player','name');
-  // Helper reused from leaderboard scope
-  function getInitials(name) {
-    if (!name) return '?';
-    const parts = name.includes(',')
-      ? name.split(',').map(function(s) { return s.trim(); }).reverse()
-      : name.split(' ').map(function(s) { return s.trim(); });
-    return parts.filter(Boolean).map(function(s) { return s[0].toUpperCase(); }).join('');
-  }
+  const fieldLabels = disambiguateInitials(state.players);
   state.players.forEach(p => {
-    const isMe = p.id === meId();
+    const isMe   = p.id === meId();
     const colKey = 'player:' + p.name;
     const active = fieldSort.col === colKey;
     const arrow  = active ? (' ' + (fieldSort.dir === -1 ? '\u2191' : '\u2193')) : '';
     const cls    = 'r text-small sortable' + (isMe ? ' my-col-header' : '') + (active ? ' sort-active' : '');
     h += '<th class="' + cls + '" title="' + escH(p.name) + '" onclick="sortField(\'' + colKey + '\')">' +
-      escH(getInitials(p.name)) + (isMe ? ' ◀' : '') + arrow + '</th>';
+      escH(fieldLabels[p.id]) + (isMe ? ' \u25c4' : '') + arrow + '</th>';
   });
   h += '</tr></thead><tbody>';
 
