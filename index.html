@@ -2826,10 +2826,10 @@ function ctLocalToUTC(localIso) {
 }
 
 function fmtCT(utcDate) {
-  const ct = utcToCT(utcDate);
-  return ct.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) +
-    ' ' + ct.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short',
-      timeZone: isCDT(utcDate) ? 'America/Chicago' : 'America/Chicago' });
+  // Always use Intl with America/Chicago — never manually shift the date
+  const opts = { timeZone: 'America/Chicago' };
+  return utcDate.toLocaleDateString('en-US', { ...opts, weekday:'short', month:'short', day:'numeric' }) +
+    ' ' + utcDate.toLocaleTimeString('en-US', { ...opts, hour:'numeric', minute:'2-digit', timeZoneName:'short' });
 }
 
 function checkDeadlineAutoLock() {
