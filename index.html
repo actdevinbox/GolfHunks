@@ -699,11 +699,16 @@
 
     <!-- Winner Edit -->
     <div class="card">
-      <div class="card-title">🏆 Set Tournament Winners</div>
-      <p class="text-small text-muted" style="margin-bottom:11px;">
-        Set or correct the tournament winner for each locked week. The winner name must match the name in the scores CSV exactly (format: <code>Last, First</code> or <code>First Last</code>).
-      </p>
-      <div id="winnerDebug" style="font-family:var(--mono);font-size:.74rem;"></div>
+      <div class="card-title">
+        <span>🏆 Set Tournament Winners</span>
+        <button class="btn-ghost btn-sm" id="winnerCollapseBtn" onclick="toggleWinnerSection()">Show</button>
+      </div>
+      <div id="winnerSection" style="display:none;">
+        <p class="text-small text-muted" style="margin-bottom:11px;">
+          Set or correct the tournament winner for each locked week. The winner name must match the name in the scores CSV (format: <code>Last, First</code> or <code>First Last</code>).
+        </p>
+        <div id="winnerDebug" style="font-family:var(--mono);font-size:.74rem;"></div>
+      </div>
     </div>
 
     <!-- State Debug -->
@@ -1574,7 +1579,8 @@ function renderWeeklyFantasyScores() {
   }
 
   const rows = state.currentScores?.rows;
-  const picksVisible = isAdmin() || !!rows;
+  // Picks revealed once self-entry is closed (deadline passed or toggled off) or scores loaded
+  const picksVisible = isAdmin() || picksAreLocked() || !!rows;
   const myPlayerId = meId();
   const mksW = (lbl, col) => mkSortTh(lbl, col, wfsSort, 'sortWfs');
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
@@ -2388,6 +2394,15 @@ function renderStateDebug() {
   }).join('');
 }
 
+function toggleWinnerSection() {
+  const sec = document.getElementById('winnerSection');
+  const btn = document.getElementById('winnerCollapseBtn');
+  if (!sec || !btn) return;
+  const open = sec.style.display !== 'none';
+  sec.style.display = open ? 'none' : '';
+  btn.textContent = open ? 'Show' : 'Hide';
+}
+
 function renderWinnerDebug() {
   const el = document.getElementById('winnerDebug');
   if (!el) return;
@@ -2790,15 +2805,24 @@ function isCDT(date) {
 }
 
 function utcToCT(date) {
+  // Returns a Date shifted by CT offset — use getUTC* methods on the result
   const off = isCDT(date) ? CT_OFFSET_DST : CT_OFFSET_STD;
   return new Date(date.getTime() + off * 3600000);
 }
 
 function ctLocalToUTC(localIso) {
-  // localIso is from datetime-local input, treat as CT
-  const d = new Date(localIso + ':00Z');
-  const guessOff = isCDT(d) ? CT_OFFSET_DST : CT_OFFSET_STD;
-  return new Date(d.getTime() - guessOff * 3600000);
+  // localIso is "YYYY-MM-DDTHH:MM" from datetime-local — no timezone info.
+  // Parse the components manually and treat them as CT, then convert to UTC.
+  const [datePart, timePart] = localIso.split('T');
+  const [yr, mo, dy] = datePart.split('-').map(Number);
+  const [hr, mn] = (timePart || '00:00').split(':').map(Number);
+  // Create a UTC date representing these numbers as if they were CT
+  // First build as UTC to get a rough date for DST detection
+  const rough = new Date(Date.UTC(yr, mo - 1, dy, hr, mn, 0));
+  // Determine CT offset at this rough time
+  const ctOff = isCDT(rough) ? CT_OFFSET_DST : CT_OFFSET_STD;
+  // Actual UTC = CT time - CT offset (CT is behind UTC so subtract negative = add)
+  return new Date(Date.UTC(yr, mo - 1, dy, hr - ctOff, mn, 0));
 }
 
 function fmtCT(utcDate) {
@@ -2806,6 +2830,22 @@ function fmtCT(utcDate) {
   return ct.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) +
     ' ' + ct.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', timeZoneName:'short',
       timeZone: isCDT(utcDate) ? 'America/Chicago' : 'America/Chicago' });
+}
+
+function checkDeadlineAutoLock() {
+  if (!state.picksOpen) return; // already closed
+  const dl = deadlineUtc();
+  if (!dl) return; // no deadline set
+  if (Date.now() >= dl.getTime()) {
+    // Deadline has passed — auto-close self-entry
+    state.picksOpen = false;
+    saveState();
+    renderDeadlineStatus();
+    // Re-render standings since picks are now visible
+    renderWeeklyFantasyScores();
+    renderLiveStandings();
+    toast('Pick deadline passed — self-entry closed automatically', 'warn');
+  }
 }
 
 function deadlineUtc() {
@@ -2839,15 +2879,18 @@ function renderDeadlineStatus() {
   const statusEl = document.getElementById('deadlineStatus');
   if (!inp || !toggle || !statusEl) return;
 
-  // Populate input from state (convert UTC → CT local string for datetime-local)
-  if (state.pickDeadline) {
-    const utc = new Date(state.pickDeadline);
-    const ct = utcToCT(utc);
-    const pad = function(n) { return String(n).padStart(2,'0'); };
-    inp.value = ct.getFullYear() + '-' + pad(ct.getMonth()+1) + '-' + pad(ct.getDate()) +
-      'T' + pad(ct.getHours()) + ':' + pad(ct.getMinutes());
-  } else {
-    inp.value = '';
+  // Populate input from state — skip if user is actively editing the field
+  if (document.activeElement !== inp) {
+    if (state.pickDeadline) {
+      const utc = new Date(state.pickDeadline);
+      const ct  = utcToCT(utc);
+      const pad = function(n) { return String(n).padStart(2,'0'); };
+      // Use UTC getters on the shifted date — avoids browser local timezone interference
+      inp.value = ct.getUTCFullYear() + '-' + pad(ct.getUTCMonth()+1) + '-' + pad(ct.getUTCDate()) +
+        'T' + pad(ct.getUTCHours()) + ':' + pad(ct.getUTCMinutes());
+    } else {
+      inp.value = '';
+    }
   }
   toggle.checked = !!state.picksOpen;
 
@@ -3267,6 +3310,7 @@ function renderAll() {
   document.querySelector('header h1').innerHTML = '⛳ GolfHunks';
   document.title = 'GolfHunks';
 
+  checkDeadlineAutoLock();
   updateBanner();
   updateAdminWeekSelectors();
   renderCompetitorList();
@@ -3299,6 +3343,8 @@ function toast(msg, type = 'info') {
 }
 
 // ═══ INIT ═════════════════════════════════════════════════════════════════════
+setInterval(function() { if (_session) checkDeadlineAutoLock(); }, 60000);
+
 document.addEventListener('DOMContentLoaded', function() {
   // Wait for Firebase module to signal ready, then init Firestore
   if (window._firebaseReady) {
