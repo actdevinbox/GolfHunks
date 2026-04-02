@@ -242,6 +242,7 @@
   window._fsSetDoc = setDoc;
   window._fsGetDoc = getDoc;
   window._fsOnSnapshot = onSnapshot;
+  window._fsDoc = doc;
   window._firebaseReady = true;
   document.dispatchEvent(new Event('firebaseReady'));
 </script>
@@ -3378,8 +3379,9 @@ let _dgSecret = null;
 async function getDgSecret() {
   if (_dgSecret) return _dgSecret;
   try {
-    const { getDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-    const snap = await getDoc(doc(window._db, 'gfl-dev', 'secret'));
+    const snap = await window._fsGetDoc(
+      window._fsDoc(window._db, 'gfl-dev', 'secret')
+    );
     if (snap.exists()) { _dgSecret = snap.data().value; return _dgSecret; }
   } catch(e) { console.error('getDgSecret error:', e); }
   return null;
