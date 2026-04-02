@@ -1,0 +1,3456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GolfHunks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --green:#1a3a2a;--green-mid:#2d5c3e;--green-light:#3d7a52;
+    --gold:#c9a84c;--gold-light:#e8c96b;--cream:#f5f0e8;--red:#b03a2e;
+    --bg:#0f2318;--card:#162d1e;--card-border:#2a4a35;
+    --text:#f5f0e8;--text-muted:#a0b8a8;
+    --mono:'DM Mono',monospace;--serif:'Libre Baskerville',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  [style*="overflow-x:auto"]{-webkit-overflow-scrolling:touch;}
+  body{background:var(--bg);color:var(--text);font-family:var(--serif);min-height:100vh;}
+
+  header{background:var(--green);border-bottom:2px solid var(--gold);padding:13px 26px;
+    display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px;}
+  header h1{font-size:1.35rem;color:var(--gold);letter-spacing:.04em;white-space:nowrap;}
+  header h1 span{color:var(--cream);font-style:italic;font-weight:400;}
+  .nav-tabs{display:flex;gap:3px;flex-wrap:wrap;}
+  .nav-tab{background:transparent;border:1px solid transparent;color:var(--text-muted);font-family:var(--mono);
+    font-size:.72rem;padding:5px 11px;cursor:pointer;border-radius:4px;transition:all .15s;letter-spacing:.05em;text-transform:uppercase;}
+  .nav-tab:hover{color:var(--cream);border-color:var(--card-border);}
+  .nav-tab.active{background:var(--gold);color:var(--green);border-color:var(--gold);font-weight:600;}
+
+  main{max-width:1280px;margin:0 auto;padding:22px 18px;}
+
+  .tournament-banner{background:linear-gradient(135deg,var(--green) 0%,var(--green-mid) 60%,#1e4a30 100%);
+    border:1px solid var(--gold);border-radius:8px;padding:15px 22px;margin-bottom:20px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .tournament-name{font-size:1.25rem;color:var(--gold-light);}
+  .tournament-sub{font-size:.76rem;color:var(--text-muted);font-family:var(--mono);margin-top:3px;}
+  .status-pill{font-family:var(--mono);font-size:.68rem;padding:3px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase;}
+  .status-loaded{background:#2d6e3a;color:#6fe890;border:1px solid #4caf70;}
+  .status-none{background:#2a2a2a;color:#888;border:1px solid #444;}
+
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:8px;padding:20px;margin-bottom:16px;}
+  .card-title{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-family:var(--mono);
+    margin-bottom:13px;padding-bottom:8px;border-bottom:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-between;}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;}
+  .grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px;}
+  @media(max-width:900px){.grid-2-1{grid-template-columns:1fr;}}
+  @media(max-width:700px){.grid-2{grid-template-columns:1fr;}.grid-3{grid-template-columns:1fr 1fr;}}
+
+  .data-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.78rem;}
+  .data-table th{text-align:left;padding:7px 8px;color:var(--text-muted);font-size:.65rem;letter-spacing:.08em;
+    text-transform:uppercase;border-bottom:1px solid var(--card-border);white-space:nowrap;}
+  .data-table th.r{text-align:right;} .data-table th.c{text-align:center;}
+  .data-table td{padding:8px 8px;border-bottom:1px solid rgba(42,74,53,.35);vertical-align:middle;}
+  .data-table tr:last-child td{border-bottom:none;}
+  .data-table tr:hover td{background:rgba(255,255,255,.025);}
+  .r{text-align:right;} .c{text-align:center;}
+  .sortable{cursor:pointer;user-select:none;} .sortable:hover{color:var(--gold-light);}
+  .sort-active{color:var(--gold);}
+
+  /* Score colours: lower = greener in golf */
+  .score-neg{color:#5dcc7a;}.score-pos{color:#e07070;}.score-e{color:var(--text-muted);}
+  .score-mc{color:var(--gold);font-style:italic;}
+  .rank-1{color:var(--gold);font-weight:700;}
+  /* Money: best score OWES (green for that player's score), worst score WINS (red for their score but gold for prize) */
+  .money-win{color:#5dcc7a;}.money-owe{color:#e07070;}
+
+  .usage-ok{color:#5dcc7a;}.usage-warn{color:var(--gold);}.usage-max{color:var(--red);}
+
+  input,select,textarea{background:var(--bg);border:1px solid var(--card-border);color:var(--text);
+    font-family:var(--mono);font-size:.79rem;padding:7px 10px;border-radius:4px;outline:none;transition:border-color .15s;width:100%;}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold);}
+  select option{background:var(--bg);}
+  label{font-family:var(--mono);font-size:.68rem;color:var(--text-muted);display:block;margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase;}
+  .form-row{margin-bottom:12px;}
+  .btn{background:var(--gold);color:var(--green);border:none;font-family:var(--mono);font-size:.76rem;font-weight:600;
+    padding:8px 16px;border-radius:4px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:background .15s;white-space:nowrap;}
+  .btn:hover{background:var(--gold-light);}
+  .btn-danger{background:var(--red);color:#fff;}.btn-danger:hover{background:#c94535;}
+  .btn-sm{padding:4px 10px;font-size:.68rem;}
+  .btn-ghost{background:transparent;border:1px solid var(--card-border);color:var(--text-muted);font-family:var(--mono);
+    font-size:.68rem;padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:.05em;transition:all .15s;white-space:nowrap;}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
+
+  .file-upload-area{border:2px dashed var(--card-border);border-radius:6px;padding:18px;text-align:center;
+    cursor:pointer;transition:border-color .15s;font-family:var(--mono);font-size:.76rem;color:var(--text-muted);}
+  .file-upload-area:hover,.file-upload-area.drag-over{border-color:var(--gold);color:var(--gold);}
+  .file-upload-area input[type=file]{display:none;}
+  .file-loaded{border-color:var(--green-light);color:#5dcc7a;}
+
+  .stat-card{text-align:center;padding:15px 10px;}
+  .stat-num{font-size:1.85rem;font-weight:700;font-family:var(--mono);color:var(--gold);}
+  .stat-label{font-size:.65rem;color:var(--text-muted);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-top:3px;}
+
+  .tag{display:inline-block;font-family:var(--mono);font-size:.6rem;padding:1px 5px;border-radius:3px;letter-spacing:.05em;text-transform:uppercase;}
+  .tag-green{background:rgba(45,92,62,.5);color:#5dcc7a;border:1px solid #2d5c3e;}
+  .tag-red{background:rgba(176,58,46,.2);color:#e07070;border:1px solid var(--red);}
+  .tag-gold{background:rgba(201,168,76,.15);color:var(--gold);border:1px solid #6a5020;}
+  .tag-blue{background:rgba(78,130,200,.2);color:#7eb4f0;border:1px solid #4e82c8;}
+
+  .alert{padding:9px 12px;border-radius:4px;font-family:var(--mono);font-size:.74rem;margin-bottom:11px;}
+  .alert-info{background:rgba(78,130,200,.15);border:1px solid #4e82c8;color:#7eb4f0;}
+  .alert-warn{background:rgba(180,140,30,.15);border:1px solid var(--gold);color:var(--gold-light);}
+
+  .empty{text-align:center;padding:26px;color:var(--text-muted);font-family:var(--mono);font-size:.78rem;}
+  .empty-icon{font-size:1.7rem;margin-bottom:7px;}
+
+  /* Scrollable leaderboard */
+  .scroll-table-wrap{max-height:340px;overflow-y:auto;overflow-x:auto;border-radius:4px;-webkit-overflow-scrolling:touch;}
+  .scroll-table-wrap .data-table thead th{position:sticky;top:0;background:var(--card);z-index:1;}
+
+  /* Typeahead */
+  .typeahead-wrap{position:relative;}
+  .typeahead-results{position:absolute;top:100%;left:0;right:0;z-index:400;
+    background:#091a0e;border:1px solid var(--gold);border-top:none;border-radius:0 0 5px 5px;
+    max-height:230px;overflow-y:auto;}
+  .ta-item{padding:8px 11px;cursor:pointer;font-family:var(--mono);font-size:.76rem;
+    border-bottom:1px solid rgba(42,74,53,.3);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .ta-item:hover{background:rgba(201,168,76,.12);}
+  .ta-item.disabled{opacity:.38;cursor:not-allowed;pointer-events:none;}
+  .ta-item:last-child{border-bottom:none;}
+  .ta-rank{color:var(--text-muted);font-size:.66rem;white-space:nowrap;}
+
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:7px;}
+  .section-title{font-size:1rem;color:var(--gold-light);}
+  .week-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(201,168,76,.1);border:1px solid var(--gold);
+    border-radius:4px;padding:3px 9px;font-family:var(--mono);font-size:.71rem;color:var(--gold);}
+
+  /* Week history pills */
+  .week-history{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  .week-pill{font-family:var(--mono);font-size:.68rem;padding:3px 10px;border-radius:4px;cursor:pointer;
+    border:1px solid var(--card-border);color:var(--text-muted);transition:all .15s;}
+  .week-pill:hover{border-color:var(--gold);color:var(--gold);}
+  .week-pill.active{background:var(--gold);color:var(--green);border-color:var(--gold);font-weight:600;}
+
+  /* Cumulative score bar */
+  .cum-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .cum-bar-bg{flex:1;background:rgba(42,74,53,.5);border-radius:3px;height:6px;overflow:hidden;}
+  .cum-bar-fill{height:100%;border-radius:3px;transition:width .4s;}
+  .my-row{background:rgba(201,168,76,.07)!important;box-shadow:inset 3px 0 0 var(--gold);}
+  .my-col-header{background:rgba(201,168,76,.18)!important;color:var(--gold)!important;font-weight:700!important;}
+
+  .flex{display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+  .mt-16{margin-top:16px;}
+  .text-muted{color:var(--text-muted);} .text-small{font-size:.72rem;font-family:var(--mono);}
+  hr{border:none;border-top:1px solid var(--card-border);margin:16px 0;}
+  code{background:rgba(201,168,76,.1);color:var(--gold);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:.78em;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.73);z-index:200;
+    display:flex;align-items:center;justify-content:center;padding:16px;}
+  .modal{background:var(--card);border:1px solid var(--gold);border-radius:8px;
+    padding:24px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;}
+  .modal-title{font-size:1rem;color:var(--gold);margin-bottom:16px;}
+  .modal-close{float:right;background:transparent;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;}
+
+  .sg-col{color:var(--text-muted);font-size:.7rem;}
+  @media(max-width:880px){.hide-md{display:none;}}
+
+  /* ── Mobile-first overrides ── */
+  @media(max-width:600px){
+    /* Header: tighter, logo smaller, nav scrollable */
+    header{padding:8px 12px;gap:4px;flex-wrap:wrap;}
+    header h1{font-size:1.05rem;white-space:nowrap;}
+    .nav-tabs{gap:2px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+      scrollbar-width:none;padding-bottom:2px;}
+    .nav-tabs::-webkit-scrollbar{display:none;}
+    .nav-tab{padding:6px 9px;font-size:.65rem;white-space:nowrap;flex-shrink:0;min-height:36px;}
+
+    /* Header user label + sign out — compress */
+    #headerUserLabel{font-size:.62rem;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+    /* Main padding */
+    main{padding:12px 10px;}
+
+    /* Cards */
+    .card{padding:14px 12px;margin-bottom:12px;}
+
+    /* Tournament banner */
+    .tournament-banner{padding:10px 14px;}
+    .tournament-name{font-size:1rem;}
+
+    /* Tables — always scrollable on mobile */
+    .scroll-table-wrap{max-height:none;}
+    div[style*="overflow-x:auto"] table,
+    .data-table{font-size:.72rem;}
+    .data-table th{font-size:.6rem;padding:5px 5px;}
+    .data-table td{padding:6px 5px;}
+
+    /* Stat cards */
+    .stat-num{font-size:1.4rem;}
+
+    /* Forms */
+    input,select{font-size:.85rem;padding:9px 10px;min-height:42px;}
+    .btn{min-height:42px;font-size:.75rem;}
+    .btn-sm{min-height:34px;}
+    .btn-ghost{min-height:34px;}
+
+    /* Gate + setup overlays — better padding on small screens */
+    #siteGate,#setupOverlay{padding:16px 14px;}
+
+    /* Picks entry form — larger touch targets */
+    .pick-golfer-input{min-height:44px;font-size:.85rem;}
+
+    /* Cum bar — hide on very small tables */
+    .cum-bar-wrap{display:none;}
+
+    /* Week pills — scrollable row */
+    .week-history{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+    .week-history::-webkit-scrollbar{display:none;}
+    .week-pill{flex-shrink:0;}
+
+    /* Grid collapses */
+    .grid-2,.grid-3{grid-template-columns:1fr;}
+  }
+
+  #alert-toast{position:fixed;bottom:20px;right:20px;z-index:999;font-family:var(--mono);font-size:.76rem;
+    padding:10px 15px;border-radius:6px;display:none;max-width:330px;}
+</style>
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD5DEfnfocQ6BUNblnm09qdvyrCKBv0BeE",
+    authDomain: "golfhunks.firebaseapp.com",
+    projectId: "golfhunks",
+    storageBucket: "golfhunks.firebasestorage.app",
+    messagingSenderId: "781633339333",
+    appId: "1:781633339333:web:dd6d835429408879ed95ac"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const STATE_REF = doc(db, 'gfl-dev', 'state');
+
+  // Expose db helpers to main script scope
+  window._db = db;
+  window._stateRef = STATE_REF;
+  window._fsSetDoc = setDoc;
+  window._fsGetDoc = getDoc;
+  window._fsOnSnapshot = onSnapshot;
+  window._firebaseReady = true;
+  document.dispatchEvent(new Event('firebaseReady'));
+</script>
+</head>
+<body>
+
+<!-- DB loading overlay -->
+<div id="loadingOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div style="font-size:2rem;">⛳</div>
+  <div style="font-family:var(--mono);font-size:.85rem;color:var(--gold);letter-spacing:.08em;">Connecting to database…</div>
+  <div id="loadingError" style="display:none;font-family:var(--mono);font-size:.74rem;color:#e07070;max-width:340px;text-align:center;"></div>
+</div>
+
+<!-- First-run: no admin PIN set yet -->
+<div id="setupOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;">
+  <div style="font-size:2.4rem;">⛳</div>
+  <div style="font-family:var(--mono);font-size:1.1rem;color:var(--gold);letter-spacing:.06em;">First-Time Setup</div>
+  <div style="max-width:360px;text-align:center;font-family:var(--mono);font-size:.78rem;color:var(--text-muted);line-height:1.6;">
+    No admin PIN is set yet. Create one now — this PIN grants full admin access.
+    Keep it private. You can change it later in Admin → League Settings.
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px;">
+    <div class="form-row"><label>Admin PIN</label>
+      <input type="password" id="setupPin1" maxlength="4" placeholder="4 digits"
+        style="letter-spacing:.2em;font-size:1rem;" /></div>
+    <div class="form-row"><label>Confirm PIN</label>
+      <input type="password" id="setupPin2" maxlength="4" placeholder="4 digits"
+        style="letter-spacing:.2em;font-size:1rem;"
+        onkeydown="if(event.key==='Enter')saveAdminPinSetup()" /></div>
+    <div id="setupError" style="color:#e07070;font-family:var(--mono);font-size:.74rem;display:none;"></div>
+    <button class="btn" onclick="saveAdminPinSetup()">Set Admin PIN &amp; Enter</button>
+  </div>
+</div>
+
+<!-- Site gate: name + PIN login -->
+<div id="siteGate" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9997;
+  flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;">
+  <div style="font-size:2.4rem;">⛳</div>
+  <div style="font-family:var(--mono);font-size:1.1rem;color:var(--gold);letter-spacing:.06em;" id="gateLeagueName">GolfHunks</div>
+  <div style="max-width:340px;width:100%;display:flex;flex-direction:column;gap:14px;">
+    <div class="form-row">
+      <label>Your Name</label>
+      <select id="gateNameSelect" style="font-size:.9rem;">
+        <option value="">— select your name —</option>
+        <option value="__admin__">Admin</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>PIN</label>
+      <input type="password" id="gatePinInput" maxlength="4" placeholder="4-digit PIN"
+        style="letter-spacing:.25em;font-size:1.1rem;"
+        onkeydown="if(event.key==='Enter')siteLogin()" />
+    </div>
+    <div id="gateError" style="color:#e07070;font-family:var(--mono);font-size:.74rem;display:none;"></div>
+    <button class="btn" style="width:100%;padding:12px;" onclick="siteLogin()">Enter</button>
+  </div>
+</div>
+
+<header>
+  <h1>⛳ GolfHunks</h1>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="showTab('standings')">Standings</button>
+    <button class="nav-tab" onclick="showTab('leaderboard')">Current Week</button>
+    <button class="nav-tab" onclick="showTab('mypicks')">My Picks</button>
+    <button class="nav-tab" onclick="showTab('history')">Week History</button>
+    <button class="nav-tab" onclick="showTab('field')">Players</button>
+    <button class="nav-tab" id="adminTabBtn" style="display:none;" onclick="showTab('admin')">Admin</button>
+  </nav>
+  <div style="display:flex;align-items:center;gap:10px;padding:0 12px;">
+    <span style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted);" id="headerUserLabel"></span>
+    <button class="btn-ghost btn-sm" onclick="siteLogout()" style="font-size:.72rem;">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <!-- BANNER -->
+  <div class="tournament-banner" id="tournBanner">
+    <div>
+      <div class="tournament-name" id="tournName">No scores loaded</div>
+      <div class="tournament-sub" id="tournSub">Upload scores &amp; picks CSVs in the Admin tab</div>
+    </div>
+    <span class="status-pill status-none" id="tournStatus">No Data</span>
+  </div>
+
+  <!-- ══ LEADERBOARD TAB ══ -->
+  <div id="tab-leaderboard" style="display:none;">
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card stat-card"><div class="stat-num" id="statPlayers">0</div><div class="stat-label">Competitors</div></div>
+      <div class="card stat-card"><div class="stat-num" id="statWeek">—</div><div class="stat-label">Current Week</div></div>
+    </div>
+
+    <!-- Fantasy scores FIRST (fix #2) -->
+    <div class="card">
+      <div class="card-title">
+        <span>This Week's Fantasy Scores</span>
+        <span class="text-small text-muted" id="fantasyWeekLabel"></span>
+      </div>
+
+      <div id="weekly-scores"><div class="empty"><div class="empty-icon">📋</div>Upload picks &amp; scores CSVs to see results.</div></div>
+    </div>
+
+    <!-- Leaderboard second, shrunk + scrollable -->
+    <div class="card" id="lbCard">
+      <div class="card-title">
+        <span>Tournament Leaderboard</span>
+        <button class="btn-ghost btn-sm" id="lbToggleBtn" onclick="toggleLeaderboardExpand()">Show all</button>
+      </div>
+      <div class="flex" style="margin-bottom:10px;">
+        <input type="text" id="lbSearch" placeholder="Search player…" oninput="renderLeaderboardTable()" style="max-width:240px;" />
+      </div>
+      <div id="pga-leaderboard"><div class="empty"><div class="empty-icon">📄</div>No scores loaded — upload a CSV in the Admin tab.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ MY PICKS TAB ══ -->
+  <div id="tab-mypicks" style="display:none;">
+
+    <!-- Identity card: shown when not signed in -->
+    <div class="card" id="picksLoginCard">
+      <div class="card-title">Enter Your Picks</div>
+      <p class="text-small text-muted" style="margin-bottom:14px;">Select your name and enter your PIN to view and submit your picks.</p>
+      <div class="grid-2" style="max-width:400px;">
+        <div class="form-row">
+          <label>Your Name</label>
+          <select id="picksLoginName">
+            <option value="">— select —</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>PIN</label>
+          <input type="password" id="picksLoginPin" maxlength="4" placeholder="4-digit PIN"
+            onkeydown="if(event.key==='Enter')competitorLogin()" style="letter-spacing:.2em;" />
+        </div>
+      </div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="competitorLogin()">Sign In</button>
+      </div>
+      <div id="picksLoginError" class="text-small" style="color:#e07070;margin-top:8px;display:none;"></div>
+    </div>
+
+    <!-- Picks entry card: shown when signed in -->
+    <div class="card" id="picksEntryCard" style="display:none;">
+      <div class="card-title">
+        <span id="picksEntryTitle">My Picks</span>
+        <button class="btn-ghost btn-sm" onclick="competitorLogout()">Sign out</button>
+      </div>
+      <div id="picksDeadlineBanner" style="font-family:var(--mono);font-size:.72rem;margin-bottom:14px;
+        padding:8px 12px;border-radius:4px;background:rgba(0,0,0,.2);border-left:3px solid var(--gold);"></div>
+      <div id="picksEntryBody"></div>
+    </div>
+
+  </div>
+
+  <!-- ══ STANDINGS TAB ══ -->
+  <div id="tab-standings">
+
+    <!-- LIVE: current week in progress + all locked weeks combined -->
+    <div class="card">
+      <div class="card-title">
+        <span>Live Standings — Week <span id="liveStandingsWkLabel">—</span> In Progress</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="status-pill status-none" id="liveStandingsPill">No data</span>
+          <button class="btn-ghost btn-sm" id="liveToggleBtn" onclick="toggleLiveStandings()">Show</button>
+        </div>
+      </div>
+      <div id="liveStandingsBody" style="display:none;">
+        <div style="font-family:var(--mono);font-size:.68rem;color:var(--text-muted);margin-bottom:10px;padding:6px 10px;
+          background:rgba(0,0,0,.2);border-radius:4px;border-left:3px solid var(--gold);">
+          Locked weeks + current live week combined. <em>Not final until locked.</em>
+          &nbsp;·&nbsp;🏆 best (lowest) wins $<span id="liveRulesPrize">—</span>
+          &nbsp;·&nbsp;💸 worst (highest) owes $<span id="liveRulesPenalty">—</span>
+        </div>
+        <div id="live-standings"><div class="empty"><div class="empty-icon">📡</div>Load scores &amp; picks to see live standings.</div></div>
+      </div>
+    </div>
+
+    <!-- COMPLETED: only locked weeks -->
+    <div class="card">
+      <div class="card-title">Standings: Completed Tournaments</div>
+      <div id="cumulative-scores"><div class="empty"><div class="empty-icon">🏆</div>Lock weeks to build standings.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Money Tracker</div>
+      <div id="money-table"><div class="empty">No locked weeks yet.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ WEEK HISTORY TAB ══ -->
+  <div id="tab-history" style="display:none;">
+    <div class="card">
+      <div class="card-title">Week-by-Week Results</div>
+      <div class="week-history" id="weekPills"></div>
+      <div id="history-detail"><div class="empty"><div class="empty-icon">📅</div>Select a week above to view results.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ FIELD TAB ══ -->
+  <div id="tab-field" style="display:none;">
+    <div class="card">
+      <div class="card-title">
+        <span>Players</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" id="fieldToggleField" onclick="setFieldView('field')">This Week</button>
+          <button class="btn-ghost btn-sm" id="fieldToggleAll" onclick="setFieldView('all')">All</button>
+        </div>
+      </div>
+      <div class="alert alert-info" id="fieldUploadHint">
+        Upload a field file in <strong>Admin → Upload Field File</strong>.
+      </div>
+      <div class="flex" style="margin-bottom:13px;">
+        <input type="text" id="fieldSearch" placeholder="Search player..." oninput="renderFieldTable()" style="max-width:260px;" />
+        <span class="text-small text-muted" id="fieldCount"></span>
+      </div>
+      <div id="field-table"><div class="empty"><div class="empty-icon">🌍</div>No player list loaded.</div></div>
+    </div>
+  </div>
+
+  <!-- ══ ADMIN TAB ══ -->
+  <div id="tab-admin" style="display:none;">
+
+    <!-- DataGolf Live API -->
+    <div class="card" style="border-color:var(--gold);">
+      <div class="card-title">&#x26A1; DataGolf Live <span class="tag tag-gold" style="margin-left:8px;">API</span></div>
+      <p class="text-small text-muted" style="margin-bottom:14px;">
+        Fetch live data directly from DataGolf. Scores auto-refresh every 5 min when a tournament is active.
+        Use <strong>Fetch Field</strong> at the start of each week, then <strong>Fetch Scores</strong> to go live.
+        Rankings only need refreshing once per week.
+      </p>
+      <div class="form-row">
+        <label>Tournament Name (optional override)</label>
+        <input type="text" id="dgTournName" placeholder="e.g. The Masters 2026 &mdash; leave blank to use DataGolf name" />
+      </div>
+      <div class="form-row" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="dgIsMajor" style="width:auto;" />
+        <label style="margin-bottom:0;color:var(--gold);">&#x2B50; This is a Major (all scores doubled)</label>
+      </div>
+      <div class="flex mt-16" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn" onclick="dgFetchField()">&#x1F4CB; Fetch Field</button>
+        <button class="btn" onclick="dgFetchScores()">&#x1F3CC; Fetch Scores</button>
+        <button class="btn-ghost" onclick="dgFetchRankings()">&#x1F4CA; Refresh Rankings</button>
+      </div>
+      <div id="dgStatus" style="margin-top:12px;font-family:var(--mono);font-size:.74rem;"></div>
+    </div>
+
+    <!-- Picks CSV upload (fix #5) -->
+    <div class="card">
+      <div class="card-title">Upload Picks CSV</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
+        Columns: <code>Competitor, tournament, Golfer1, Golfer2, Golfer3, Golfer4, Golfer5</code><br>
+        <code>Competitor</code> = league player name. <code>tournament</code> = week label (e.g. <em>The Masters</em>).<br>
+        Competitors are auto-created if new. All rows sharing the same <code>tournament</code> are loaded as the current week's picks.
+      </p>
+      <div class="file-upload-area" id="picksDropZone"
+           onclick="document.getElementById('picksFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event,'picks')">
+        <input type="file" id="picksFileInput" accept=".csv" onchange="handlePicksFile(this.files[0])" />
+        <div id="picksDropLabel">📋 Click or drag &amp; drop picks CSV here</div>
+      </div>
+      <div id="picksPreview" style="margin-top:11px;"></div>
+      <div id="picksWarning" style="display:none;margin-top:10px;"></div>
+      <div class="form-row" style="margin-top:12px;">
+        <label>Load picks into week</label>
+        <select id="picksWeekSelect" style="max-width:200px;">
+          <option value="current">Current (Week <span id="picksWeekCurrent"></span>)</option>
+        </select>
+      </div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="loadPicks()">Load Picks</button>
+        <button class="btn-ghost" onclick="clearPicks()">Clear This Week's Picks</button>
+      </div>
+    </div>
+
+    <!-- Score CSV upload -->
+    <div class="card">
+      <div class="card-title">Upload Tournament Scores CSV</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
+        Required: <code>player_name</code>, <code>score</code><br>
+        Full set: <code>position, player_name, course, score, thru, today, sg_putt, sg_arg, sg_app, sg_ott, sg_t2g, sg_total</code><br>
+        Position: <code>T8</code> = tied, <code>3</code> = solo, <code>CUT</code>/<code>WD</code>/<code>DQ</code> = missed cut. Name: <code>Last, First</code>
+      </p>
+      <div class="form-row">
+        <label>Tournament Name (overrides tournament from picks CSV)</label>
+        <input type="text" id="uploadTournName" placeholder="e.g. The Masters 2025" />
+      </div>
+      <div class="form-row">
+        <label>Round</label>
+        <select id="uploadRound" style="max-width:160px;">
+          <option value="">— select —</option>
+          <option value="Pre">Pre-Tournament</option>
+          <option value="R1">Round 1</option>
+          <option value="R2">Round 2</option>
+          <option value="R3">Round 3</option>
+          <option value="Final">Final</option>
+        </select>
+      </div>
+      <div class="form-row" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="isMajor" style="width:auto;" />
+        <label style="margin-bottom:0;color:var(--gold);">⭐ This is a Major (all scores doubled)</label>
+      </div>
+      <div class="file-upload-area" id="scoreDropZone"
+           onclick="document.getElementById('scoreFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event,'score')">
+        <input type="file" id="scoreFileInput" accept=".csv" onchange="handleScoreFile(this.files[0])" />
+        <div id="scoreDropLabel">📄 Click or drag &amp; drop scores CSV here</div>
+      </div>
+      <div id="scorePreview" style="margin-top:11px;"></div>
+      <div class="form-row" style="margin-top:12px;">
+        <label>Load scores for week</label>
+        <select id="scoresWeekSelect" style="max-width:200px;">
+          <option value="current">Current (Week <span id="scoresWeekCurrent"></span>)</option>
+        </select>
+      </div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="loadScores()">Load Scores</button>
+        <button class="btn-ghost" onclick="clearScores()">Clear Scores</button>
+      </div>
+    </div>
+
+    <!-- Full OWGR Rankings upload -->
+    <div class="card">
+      <div class="card-title">Upload Full OWGR Rankings</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
+        Full season-long rankings used for the <strong>All Players</strong> view on the Players tab.
+        Accepts <code>owgr_rank,player_name</code> CSV. Load once per season or whenever rankings update.
+      </p>
+      <div class="file-upload-area" id="owgrDropZone"
+           onclick="document.getElementById('owgrFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event,'owgr')">
+        <input type="file" id="owgrFileInput" accept=".csv,.txt" onchange="handleOwgrFile(this.files[0])" />
+        <div id="owgrDropLabel">📊 Click or drag &amp; drop OWGR CSV here</div>
+      </div>
+      <div id="owgrPreview" style="margin-top:8px;"></div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="loadOwgrList()">Load OWGR</button>
+        <button class="btn-ghost" onclick="clearOwgrList()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Field / Player List upload -->
+    <div class="card">
+      <div class="card-title">Upload Field File</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
+        Accepts the pipe-delimited field file (<code>event_name|player_name|owgr_rank|current_round…</code>)
+        or the old OWGR CSV (<code>owgr_rank,player_name</code>). Automatically sets tournament name from <code>event_name</code>.
+        Persists across sessions.
+      </p>
+      <div class="file-upload-area" id="playerListDropZone"
+           onclick="document.getElementById('playerListFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event,'playerList')">
+        <input type="file" id="playerListFileInput" accept=".csv,.txt" onchange="handlePlayerListFile(this.files[0])" />
+        <div id="playerListDropLabel">📄 Click or drag &amp; drop field file here</div>
+      </div>
+      <div id="playerListPreview" style="margin-top:11px;"></div>
+      <div id="fieldUploadHint" style="display:none;"></div>
+      <div class="flex mt-16">
+        <button class="btn" onclick="loadPlayerList()">Load Field</button>
+        <button class="btn-ghost" onclick="clearPlayerList()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Manage Competitors & PINs -->
+    <div class="card">
+      <div class="card-title">Manage Competitors &amp; PINs</div>
+      <p class="text-small text-muted" style="margin-bottom:12px;">
+        Add competitors manually, set their 4-digit PIN, and share it with them privately.
+        Competitors use their name + PIN to enter the site via the login screen.
+        Remove entries with ✕.
+      </p>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;
+        padding:12px 14px;background:rgba(0,0,0,.2);border-radius:6px;border-left:3px solid var(--green-light);">
+        <div class="form-row" style="margin-bottom:0;flex:1;min-width:160px;">
+          <label>Name</label>
+          <input type="text" id="newCompetitorName" placeholder="Full name" />
+        </div>
+        <div class="form-row" style="margin-bottom:0;width:100px;">
+          <label>PIN</label>
+          <input type="text" id="newCompetitorPin" maxlength="4" placeholder="0000"
+            style="letter-spacing:.15em;"
+            onkeydown="if(event.key==='Enter')addCompetitor()" />
+        </div>
+        <button class="btn" onclick="addCompetitor()" style="margin-bottom:1px;">Add</button>
+      </div>
+      <div id="competitorList"><div class="empty" style="padding:10px">No competitors yet — add one above.</div></div>
+    </div>
+
+    <!-- Pick Deadline & Self-Entry -->
+    <div class="card">
+      <div class="card-title">Pick Deadline &amp; Self-Entry</div>
+      <p class="text-small text-muted" style="margin-bottom:12px;">
+        Set a deadline for competitor pick submissions (Central Time). After the deadline, the <strong>My Picks</strong> tab locks.
+        Toggle self-entry on/off independently of the deadline.
+      </p>
+      <div class="grid-2" style="max-width:480px;">
+        <div class="form-row">
+          <label>Pick Deadline (Central Time)</label>
+          <input type="datetime-local" id="pickDeadlineInput" />
+        </div>
+        <div class="form-row" style="display:flex;align-items:center;gap:10px;padding-top:22px;">
+          <input type="checkbox" id="picksOpenToggle" style="width:auto;" onchange="saveDeadlineSettings()" />
+          <label style="margin-bottom:0;">Self-entry open</label>
+        </div>
+      </div>
+      <div class="flex mt-16" style="gap:8px;align-items:center;">
+        <button class="btn" onclick="saveDeadlineSettings()">Save Deadline</button>
+        <span class="text-small text-muted" id="deadlineStatus"></span>
+      </div>
+    </div>
+
+    <!-- Submission Status -->
+    <div class="card">
+      <div class="card-title">Pick Submission Status</div>
+      <div id="submissionStatus"><div class="empty">No competitors yet.</div></div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="card">
+      <div class="card-title">Pick Change Audit Log</div>
+      <p class="text-small text-muted" style="margin-bottom:10px;">Every time a competitor submits or changes picks, it is recorded here.</p>
+      <div id="auditLogTable"><div class="empty">No changes logged yet.</div></div>
+    </div>
+
+    <!-- League Settings -->
+    <div class="card">
+      <div class="card-title">League Settings</div>
+      <div class="grid-2">
+        <div class="form-row"><label>League Name</label><input type="text" id="leagueName" /></div>
+        <div class="form-row"><label>Season Year</label><input type="number" id="seasonYear" /></div>
+        <div class="form-row"><label>Max Uses Per Golfer (Season)</label><input type="number" id="maxUses" min="1" max="10" /></div>
+        <div class="form-row"><label>Best Score Prize ($)</label><input type="number" id="highPrize" /></div>
+        <div class="form-row"><label>Worst Score Penalty ($)</label><input type="number" id="lowPenalty" /></div>
+        <div class="form-row"><label>Admin PIN</label>
+          <input type="password" id="adminPinInput" maxlength="4" placeholder="4 digits"
+            style="letter-spacing:.2em;max-width:120px;" /></div>
+      </div>
+      <button class="btn" onclick="saveSettings()">Save Settings</button>
+    </div>
+
+    <!-- Lock Week -->
+    <div class="card">
+      <div class="card-title">Lock Week Results</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
+        Review calculated results below, then lock to permanently record the week's scores and money.
+        To re-lock a prior week: remove it first, reload picks &amp; scores for that week, select it below, then lock.
+        <strong style="color:var(--gold);">This stores the full pick-by-pick breakdown for the history tab.</strong>
+      </p>
+      <div class="form-row" style="margin-bottom:13px;">
+        <label>Lock into week</label>
+        <select id="lockWeekSelect" style="max-width:220px;" onchange="updateLockWeekLabel()">
+          <option value="current">Current (Week <span id="lockWeekNum">1</span>)</option>
+        </select>
+      </div>
+      <div id="admin-week-scores"><div class="empty">Upload picks and scores CSVs to see results here.</div></div>
+      <div class="mt-16">
+        <button class="btn" onclick="lockCurrentWeek()">🔒 Lock Week <span id="lockWeekNum2">1</span></button>
+      </div>
+    </div>
+
+    <!-- Remove Locked Week -->
+    <div class="card">
+      <div class="card-title">Remove Locked Week</div>
+      <p class="text-small text-muted" style="margin-bottom:10px;">Permanently delete a locked week's results and money history.</p>
+      <div class="flex">
+        <select id="removeWeekSelect" style="max-width:220px;"></select>
+        <button class="btn btn-danger btn-sm" onclick="removeLockedWeek()">Remove Week</button>
+      </div>
+      <div id="removeWeekHint" class="text-small text-muted" style="margin-top:6px;"></div>
+    </div>
+
+    <!-- Winner Edit -->
+    <div class="card">
+      <div class="card-title">
+        <span>🏆 Set Tournament Winners</span>
+        <button class="btn-ghost btn-sm" id="winnerCollapseBtn" onclick="toggleWinnerSection()">Show</button>
+      </div>
+      <div id="winnerSection" style="display:none;">
+        <p class="text-small text-muted" style="margin-bottom:11px;">
+          Set or correct the tournament winner for each locked week. The winner name must match the name in the scores CSV (format: <code>Last, First</code> or <code>First Last</code>).
+        </p>
+        <div id="winnerDebug" style="font-family:var(--mono);font-size:.74rem;"></div>
+      </div>
+    </div>
+
+    <!-- State Debug -->
+    <div class="card">
+      <div class="card-title">🔍 State Debug</div>
+      <p class="text-small text-muted" style="margin-bottom:8px;">Shows key state values as currently loaded in memory and saved in Firestore.</p>
+      <div id="stateDebug" style="font-family:var(--mono);font-size:.7rem;line-height:1.8;"></div>
+      <button class="btn-ghost btn-sm" style="margin-top:8px;" onclick="renderStateDebug()">Refresh</button>
+    </div>
+
+    <!-- Danger -->
+    <div class="card">
+      <div class="card-title">Danger Zone</div>
+      <div class="flex" style="margin-bottom:12px;">
+        <button class="btn btn-danger btn-sm" onclick="resetSeason()">Reset Season Data</button>
+        <span class="text-small text-muted">Clears picks, scores, locked history &amp; money. Keeps players, PINs &amp; player list.</span>
+      </div>
+      <div class="flex">
+        <button class="btn btn-danger btn-sm" onclick="fullReset()">Full Reset</button>
+        <span class="text-small text-muted">Wipes <strong>everything</strong> — players, PINs, admin PIN, all data. Returns to first-run setup. Use for testing only.</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="alert-toast"></div>
+
+<script>
+'use strict';
+
+// ═══ STATE ═══════════════════════════════════════════════════════════════════
+const TABS = ['standings','leaderboard','mypicks','history','field','admin'];
+let state = defaultState();
+let pendingScoreCsv   = null;
+let pendingPicksCsv   = null;
+let pendingPlayerCsv  = null;
+let lbExpanded = false;
+let _saveTimeout = null;
+
+function defaultState() {
+  return {
+    settings: {
+      leagueName: 'GolfHunks',
+      seasonYear: 2025,
+      maxUses: 3,
+      lowPenalty: 10,
+      highPrize: 30,
+      adminPin: '',   // 4-digit admin PIN — set on first run
+    },
+    players: [],        // [{id, name, pin}]
+    currentWeek: 1,
+    currentTournName: '',
+    picks: {},
+    currentScores: null,
+    lockedWeeks: {},
+    playerList: [],   // current week field (for picks typeahead)
+    owgrList: [],     // full OWGR rankings (for Players tab 'All Players' view)
+    pickDeadline: null,   // ISO string (UTC) of when picks lock
+    currentRound: '',     // 'Pre','R1','R2','R3','Final'
+    picksOpen: false,     // admin toggle: allows competitor self-entry
+    auditLog: [],         // [{ts, competitorName, week, prev, next, changedBy}]
+  };
+}
+
+function mergeState(remote) {
+  const d = defaultState();
+  return {
+    ...d, ...remote,
+    settings: { ...d.settings, ...(remote.settings||{}) },
+    auditLog: remote.auditLog || [],
+    owgrList: remote.owgrList || [],
+    picksOpen: remote.picksOpen || false,
+    pickDeadline: remote.pickDeadline || null,
+    currentRound: remote.currentRound || '',
+    // Ensure players always have pin field
+    players: (remote.players||[]).map(function(p) {
+      return { id: p.id, name: p.name, pin: p.pin || '' };
+    }),
+  };
+}
+
+// Debounced Firestore write — batches rapid successive saves into one write
+function saveState() {
+  clearTimeout(_saveTimeout);
+  _saveTimeout = setTimeout(function() {
+    if (!window._stateRef || !window._fsSetDoc) return;
+    // currentScores.rows can be large; strip _isMajor transient flag before saving
+    const toSave = JSON.parse(JSON.stringify(state));
+    window._fsSetDoc(window._stateRef, toSave)
+      .catch(function(e) { console.error('Firestore save failed:', e); });
+  }, 400);
+}
+
+// Load state from Firestore once, then set up real-time listener for cross-device sync
+async function initFirestore() {
+  try {
+    const snap = await window._fsGetDoc(window._stateRef);
+    if (snap.exists()) {
+      state = mergeState(snap.data());
+    } else {
+      // First ever load — write default state
+      await window._fsSetDoc(window._stateRef, state);
+    }
+
+    // Real-time listener: update state and re-render when another device saves
+    window._fsOnSnapshot(window._stateRef, function(snap) {
+      if (!snap.exists()) return;
+      const incoming = mergeState(snap.data());
+      if (JSON.stringify(incoming) !== JSON.stringify(state)) {
+        state = incoming;
+        if (_session) renderAll();
+      }
+    });
+
+    // Hide loading overlay — show setup or gate
+    document.getElementById('loadingOverlay').style.display = 'none';
+    if (!state.settings.adminPin) {
+      document.getElementById('setupOverlay').style.display = 'flex';
+    } else {
+      showSiteGate();
+    }
+  } catch(e) {
+    document.getElementById('loadingError').textContent =
+      'Could not connect to database: ' + e.message + '. Check your internet connection and Firestore rules.';
+    document.getElementById('loadingError').style.display = '';
+    console.error('Firestore init error:', e);
+  }
+}
+
+// ═══ CSV PARSING ══════════════════════════════════════════════════════════════
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  // Keep original case for picks CSV (Competitor, tournament, GolferN), lowercase keys for others
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { cols.push(cur.trim().replace(/^"|"$/g,'')); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur.trim().replace(/^"|"$/g,''));
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (cols[i] || '').trim(); });
+    return obj;
+  });
+}
+
+function readFile(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsText(file);
+  });
+}
+
+function handleDrop(e, type) {
+  e.preventDefault();
+  const ids = {score:'scoreDropZone', picks:'picksDropZone', playerList:'playerListDropZone'};
+  document.getElementById(ids[type]).classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (type === 'score') handleScoreFile(file);
+  else if (type === 'picks') handlePicksFile(file);
+  else if (type === 'owgr') handleOwgrFile(file);
+  else handlePlayerListFile(file);
+}
+
+// ═══ PICKS CSV (fix #5) ═══════════════════════════════════════════════════════
+// Format: Competitor, tournament, Golfer1, Golfer2, Golfer3, Golfer4, Golfer5
+async function handlePicksFile(file) {
+  if (!file) return;
+  const text = await readFile(file);
+  const rows = parseCsv(text);
+  if (!rows.length) { toast('CSV empty or malformed', 'warn'); return; }
+
+  // Validate — case-insensitive header check
+  const headers = Object.keys(rows[0]).map(h => h.toLowerCase());
+  if (!headers.includes('competitor') || !headers.includes('tournament')) {
+    toast('Missing Competitor or tournament column', 'error'); return;
+  }
+
+  pendingPicksCsv = rows;
+  document.getElementById('picksDropZone').classList.add('file-loaded');
+  document.getElementById('picksDropLabel').textContent = '✓ ' + file.name + ' (' + rows.length + ' rows)';
+
+  // Preview
+  const sample = rows.slice(0, 5), cols = Object.keys(sample[0]);
+  let h = '<p class="text-small text-muted" style="margin-bottom:7px;">Preview (' + Math.min(5,rows.length) + ' of ' + rows.length + ' rows):</p>';
+  h += '<div style="overflow-x:auto"><table class="data-table"><thead><tr>';
+  cols.forEach(c => h += '<th>' + c + '</th>');
+  h += '</tr></thead><tbody>';
+  sample.forEach(r => { h += '<tr>'; cols.forEach(c => h += '<td class="text-small">' + (r[c]||'—') + '</td>'); h += '</tr>'; });
+  document.getElementById('picksPreview').innerHTML = h + '</tbody></table></div>';
+}
+
+function loadPicks() {
+  if (!pendingPicksCsv) { toast('Upload a picks CSV first', 'warn'); return; }
+
+  // Normalize header keys to lowercase
+  const rows = pendingPicksCsv.map(r => {
+    const norm = {};
+    Object.entries(r).forEach(([k,v]) => { norm[k.toLowerCase()] = v; });
+    return norm;
+  });
+
+  // Get tournament name from first row
+  const tournFromCsv = rows[0].tournament || '';
+  const tournName = tournFromCsv || ('Week ' + state.currentWeek);
+
+  // Auto-create competitors
+  rows.forEach(r => {
+    const name = (r.competitor || '').trim();
+    if (!name) return;
+    if (!state.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+      state.players.push({ id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2), name });
+    }
+  });
+
+  // Determine target week from selector
+  const pwSel = document.getElementById('picksWeekSelect');
+  const wk = (pwSel && pwSel.value !== 'current') ? parseInt(pwSel.value, 10) : state.currentWeek;
+  if (!state.picks[wk]) state.picks[wk] = {};
+
+  rows.forEach(r => {
+    const name = (r.competitor || '').trim();
+    if (!name) return;
+    const player = state.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (!player) return;
+    const golfers = ['golfer1','golfer2','golfer3','golfer4','golfer5']
+      .map(k => (r[k]||'').trim()).filter(Boolean);
+    state.picks[wk][player.id] = golfers;
+  });
+
+  // Set tournament name if not already set
+  if (!state.currentTournName) state.currentTournName = tournName;
+
+  saveState();
+  renderAll();
+
+  // Warn if any picked golfer is not in the player list
+  if (state.playerList.length) {
+    const allPicks = new Set();
+    rows.forEach(r => {
+      ['golfer1','golfer2','golfer3','golfer4','golfer5'].forEach(k => {
+        const g = (r[k] || '').trim();
+        if (g) allPicks.add(g.toLowerCase());
+      });
+    });
+    const plNames = new Set(state.playerList.map(p => p.player_name.toLowerCase()));
+    // also register "First Last" variants
+    state.playerList.forEach(p => {
+      if (p.player_name.includes(',')) {
+        const pts = p.player_name.split(',');
+        plNames.add((pts[1].trim() + ' ' + pts[0].trim()).toLowerCase());
+      }
+    });
+    const missing = [...allPicks].filter(g => !plNames.has(g));
+    const warnEl = document.getElementById('picksWarning');
+    if (missing.length) {
+      const warnHtml = '<div class="alert alert-warn" style="border-left:4px solid var(--gold);padding:12px 14px;">' +
+        '<strong>⚠ ' + missing.length + ' golfer' + (missing.length !== 1 ? 's' : '') + ' not found in player list</strong><br>' +
+        '<span style="font-size:.72rem;display:block;margin-top:5px;">' +
+        missing.map(function(n) { return '<code>' + escH(n) + '</code>'; }).join(', ') +
+        '</span><br><span style="font-size:.7rem;color:var(--text-muted);">These picks will still score — but they may be misspelled or not in this field. Check the Players tab.</span>' +
+        '</div>';
+      if (warnEl) { warnEl.innerHTML = warnHtml; warnEl.style.display = ''; }
+      toast('⚠ ' + missing.length + ' pick(s) not found in player list — see Admin for details', 'warn');
+      console.warn('Picks not in player list:', missing);
+    } else {
+      if (warnEl) { warnEl.innerHTML = ''; warnEl.style.display = 'none'; }
+      toast('Picks loaded — ' + rows.length + ' competitors for "' + tournName + '"', 'success');
+    }
+  } else {
+    const warnEl = document.getElementById('picksWarning');
+    if (warnEl) { warnEl.innerHTML = ''; warnEl.style.display = 'none'; }
+    toast('Picks loaded — ' + rows.length + ' competitors for "' + tournName + '"', 'success');
+  }
+}
+
+function clearPicks() {
+  const wk = state.currentWeek;
+  state.picks[wk] = {};
+  saveState(); renderAll();
+  toast('Picks cleared for week ' + wk, 'warn');
+}
+
+// ═══ SCORE CSV ════════════════════════════════════════════════════════════════
+async function handleScoreFile(file) {
+  if (!file) return;
+  const text = await readFile(file);
+  const rows = parseCsv(text);
+  if (!rows.length) { toast('CSV empty or malformed','warn'); return; }
+
+  // Normalize header keys
+  const norm = rows.map(r => {
+    const n = {};
+    Object.entries(r).forEach(([k,v]) => { n[k.toLowerCase().replace(/\s+/g,'_')] = v; });
+    return n;
+  });
+
+  if (!('player_name' in norm[0]) || !('score' in norm[0])) {
+    const miss = []; if(!('player_name' in norm[0]))miss.push('player_name'); if(!('score' in norm[0]))miss.push('score');
+    toast('Missing: ' + miss.join(', '), 'error'); return;
+  }
+
+  pendingScoreCsv = norm;
+  document.getElementById('scoreDropZone').classList.add('file-loaded');
+  document.getElementById('scoreDropLabel').textContent = '✓ ' + file.name + ' (' + norm.length + ' rows)';
+
+  const sample = norm.slice(0,5), cols = Object.keys(sample[0]);
+  let h = '<p class="text-small text-muted" style="margin-bottom:7px;">Preview (' + Math.min(5,norm.length) + ' of ' + norm.length + ' rows):</p>';
+  h += '<div style="overflow-x:auto"><table class="data-table"><thead><tr>';
+  cols.forEach(c => h += '<th>' + c + '</th>');
+  h += '</tr></thead><tbody>';
+  sample.forEach(r => { h += '<tr>'; cols.forEach(c => h += '<td class="text-small">'+(r[c]||'—')+'</td>'); h += '</tr>'; });
+  document.getElementById('scorePreview').innerHTML = h + '</tbody></table></div>';
+}
+
+function loadScores() {
+  if (!pendingScoreCsv) { toast('Upload a scores CSV first', 'warn'); return; }
+  const swSel = document.getElementById('scoresWeekSelect');
+  const scoresTargetWk = (swSel && swSel.value !== 'current') ? parseInt(swSel.value, 10) : state.currentWeek;
+  // If targeting a specific locked week, we temporarily update currentWeek context for scoring
+  const manualName = document.getElementById('uploadTournName').value.trim();
+  const tournName = manualName || state.currentTournName || ('Week ' + scoresTargetWk);
+
+  const rows = pendingScoreCsv.map(r => {
+    const posRaw = (r.position || r.pos || '').trim();
+    const upper = posRaw.toUpperCase();
+    const isMC = upper === 'CUT' || upper === 'WD' || upper === 'DQ';
+    const isTied = !isMC && upper.startsWith('T');
+    const posNum = isMC ? 9999 : (parseInt(posRaw.replace(/\D/g,''), 10) || 999);
+    const score = parseScoreStr(r.score || r.to_par || '0');
+    const today = parseScoreStr(r.today || '0');
+    return {
+      posRaw, posNum, isTied, isMC,
+      name: (r.player_name || '').trim(),
+      course: r.course || '',
+      score, scoreDisplay: fmtScore(score),
+      thru: r.thru || '',
+      today, todayDisplay: fmtScore(today),
+      sg_putt:  r.sg_putt  != null && r.sg_putt  !== '' ? parseFloat(r.sg_putt)  : null,
+      sg_arg:   r.sg_arg   != null && r.sg_arg   !== '' ? parseFloat(r.sg_arg)   : null,
+      sg_app:   r.sg_app   != null && r.sg_app   !== '' ? parseFloat(r.sg_app)   : null,
+      sg_ott:   r.sg_ott   != null && r.sg_ott   !== '' ? parseFloat(r.sg_ott)   : null,
+      sg_t2g:   r.sg_t2g   != null && r.sg_t2g   !== '' ? parseFloat(r.sg_t2g)   : null,
+      sg_total: r.sg_total  != null && r.sg_total  !== '' ? parseFloat(r.sg_total)  : null,
+    };
+  }).filter(r => r.name);
+
+  const isMajor = document.getElementById('isMajor')?.checked || false;
+  const roundSel = document.getElementById('uploadRound');
+  state.currentRound = (roundSel && roundSel.value) ? roundSel.value : '';
+  state.currentScores = { tournName, rows, loadedAt: new Date().toLocaleString(), isMajor };
+  state.currentTournName = tournName;
+  saveState();
+  updateBanner(); renderLeaderboardTable(); renderWeeklyFantasyScores(); renderAdminWeekScores();
+  toast('Scores loaded — ' + rows.length + ' players', 'success');
+}
+
+function clearScores() {
+  state.currentScores = null; state.currentRound = ''; state.currentTournName = ''; pendingScoreCsv = null; saveState();
+  document.getElementById('scoreDropZone').classList.remove('file-loaded');
+  document.getElementById('scoreDropLabel').textContent = '📄 Click or drag & drop scores CSV here';
+  document.getElementById('scorePreview').innerHTML = '';
+  updateBanner(); renderLeaderboardTable(); renderWeeklyFantasyScores();
+  toast('Scores cleared', 'warn');
+}
+
+function parseScoreStr(s) {
+  if (s === undefined || s === null || s === '') return 0;
+  s = String(s).trim();
+  if (s === 'E' || s === '') return 0;
+  return parseFloat(s) || 0;
+}
+function fmtScore(n) { return n === 0 ? 'E' : n > 0 ? '+' + n : String(n); }
+function scoreClass(n, isMC) {
+  if (isMC) return 'score-mc';
+  if (n < 0) return 'score-neg';
+  if (n > 0) return 'score-pos';
+  return 'score-e';
+}
+
+// ═══ PLAYER LIST CSV ══════════════════════════════════════════════════════════
+async function handlePlayerListFile(file) {
+  if (!file) return;
+  const text = await readFile(file);
+
+  // Detect pipe-delimited field file vs comma CSV
+  const firstLine = text.trim().split(/\r?\n/)[0];
+  const isPipe = firstLine.includes('|');
+
+  let rows;
+  if (isPipe) {
+    // Parse pipe-delimited
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split('|').map(h => h.trim().toLowerCase());
+    rows = lines.slice(1).filter(l => l.trim()).map(line => {
+      const cols = line.split('|');
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (cols[i] || '').trim(); });
+      return obj;
+    });
+  } else {
+    const parsed = parseCsv(text);
+    rows = parsed.map(r => { const n={}; Object.entries(r).forEach(([k,v])=>{n[k.toLowerCase()]=v;}); return n; });
+  }
+
+  if (!rows.length) { toast('File empty or unreadable','warn'); return; }
+
+  // Validate player_name exists
+  if (!('player_name' in rows[0])) { toast('Missing player_name column', 'error'); return; }
+
+  // Extract event name and round from field file if available
+  const eventName = rows[0].event_name ? rows[0].event_name.trim() : null;
+  const currentRound = rows[0].current_round ? rows[0].current_round.trim() : null;
+
+  pendingPlayerCsv = rows;
+  pendingPlayerCsv._eventName = eventName;
+  pendingPlayerCsv._currentRound = currentRound;
+
+  document.getElementById('playerListDropZone').classList.add('file-loaded');
+  document.getElementById('playerListDropLabel').textContent = '✓ ' + file.name + ' (' + rows.length + ' players)';
+
+  let previewHtml = '<p class="text-small text-muted">Ready — ' + rows.length + ' players.';
+  if (eventName) previewHtml += ' Event: <strong>' + escH(eventName) + '</strong>.';
+  if (currentRound) previewHtml += ' Round: <strong>' + escH(currentRound) + '</strong>.';
+  previewHtml += '</p>';
+  document.getElementById('playerListPreview').innerHTML = previewHtml;
+}
+let pendingOwgrCsv = null;
+
+async function handleOwgrFile(file) {
+  if (!file) return;
+  const text = await readFile(file);
+  const firstLine = text.trim().split(/\r?\n/)[0];
+  const isPipe = firstLine.includes('|');
+  let rows;
+  if (isPipe) {
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split('|').map(h => h.trim().toLowerCase());
+    rows = lines.slice(1).filter(l => l.trim()).map(line => {
+      const cols = line.split('|');
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (cols[i] || '').trim(); });
+      return obj;
+    });
+  } else {
+    rows = parseCsv(text).map(r => { const n={}; Object.entries(r).forEach(([k,v])=>{n[k.toLowerCase()]=v;}); return n; });
+  }
+  if (!rows.length || !('player_name' in rows[0])) { toast('Missing player_name column', 'error'); return; }
+  pendingOwgrCsv = rows;
+  document.getElementById('owgrDropZone').classList.add('file-loaded');
+  document.getElementById('owgrDropLabel').textContent = '✓ ' + file.name + ' (' + rows.length + ' players)';
+  document.getElementById('owgrPreview').innerHTML = '<p class="text-small text-muted">Ready — ' + rows.length + ' players.</p>';
+}
+
+function loadOwgrList() {
+  if (!pendingOwgrCsv) { toast('Upload a file first', 'warn'); return; }
+  state.owgrList = pendingOwgrCsv
+    .map(r => ({ owgr_rank: parseInt(r.owgr_rank||r.dg_rank||'9999',10)||9999, player_name: r.player_name.trim() }))
+    .filter(r => r.player_name)
+    .sort((a,b) => a.owgr_rank - b.owgr_rank);
+  saveState();
+  renderFieldTable();
+  toast('OWGR rankings loaded — ' + state.owgrList.length + ' players', 'success');
+}
+
+function clearOwgrList() {
+  state.owgrList = []; pendingOwgrCsv = null; saveState();
+  document.getElementById('owgrDropZone').classList.remove('file-loaded');
+  document.getElementById('owgrDropLabel').textContent = '📊 Click or drag & drop OWGR CSV here';
+  document.getElementById('owgrPreview').innerHTML = '';
+  renderFieldTable(); toast('OWGR rankings cleared', 'warn');
+}
+
+function loadPlayerList() {
+  if (!pendingPlayerCsv) { toast('Upload a file first','warn'); return; }
+  state.playerList = pendingPlayerCsv
+    .map(r => ({
+      owgr_rank: parseInt(r.owgr_rank||r.dg_rank||'9999', 10) || 9999,
+      player_name: r.player_name.trim()
+    }))
+    .filter(r => r.player_name)
+    .sort((a,b) => a.owgr_rank - b.owgr_rank);
+
+  // Always set tournament name from event_name when loading a new field file
+  if (pendingPlayerCsv._eventName) {
+    state.currentTournName = pendingPlayerCsv._eventName;
+    const inp = document.getElementById('uploadTournName');
+    if (inp) inp.value = pendingPlayerCsv._eventName;
+  }
+  // Clear stale scores from previous tournament
+  state.currentScores = null;
+  state.currentRound = pendingPlayerCsv._currentRound || '';
+  pendingScoreCsv = null;
+
+  saveState();
+  renderFieldTable();
+  updateBanner();
+  renderLeaderboardTable();
+  renderWeeklyFantasyScores();
+  const msg = 'Field loaded — ' + state.playerList.length + ' players' +
+    (pendingPlayerCsv._eventName ? ' · ' + pendingPlayerCsv._eventName : '');
+  toast(msg, 'success');
+}
+function clearPlayerList() {
+  state.playerList = []; pendingPlayerCsv = null; saveState();
+  document.getElementById('playerListDropZone').classList.remove('file-loaded');
+  document.getElementById('playerListDropLabel').textContent = '📄 Click or drag & drop player list CSV here';
+  document.getElementById('playerListPreview').innerHTML = '';
+  renderFieldTable(); toast('Player list cleared','warn');
+}
+
+// ═══ BANNER ═══════════════════════════════════════════════════════════════════
+function updateBanner() {
+  const cs = state.currentScores;
+  const hasScores = !!cs;
+
+  // Hide banner and leaderboard when picks are open (self-entry phase) AND no scores loaded
+  const hideForSelfEntry = !hasScores && state.picksOpen;
+  const banner = document.getElementById('tournBanner');
+  const lbCard = document.getElementById('lbCard');
+  if (banner) banner.style.display = hideForSelfEntry ? 'none' : '';
+  if (lbCard) lbCard.style.display = hideForSelfEntry ? 'none' : '';
+
+  if (cs) {
+    document.getElementById('tournName').textContent = cs.tournName + (cs.isMajor ? ' ⭐' : '');
+    const roundLabel = state.currentRound ? ' · ' + state.currentRound : '';
+    document.getElementById('tournSub').textContent = cs.rows.length + ' players · Loaded ' + cs.loadedAt + roundLabel;
+    const s = document.getElementById('tournStatus');
+    s.textContent = state.currentRound ? state.currentRound : '✓ Loaded'; s.className = 'status-pill status-loaded';
+  } else {
+    document.getElementById('tournName').textContent = state.currentTournName || 'No scores loaded';
+    document.getElementById('tournSub').textContent = 'Upload a scores CSV in the Admin tab';
+    const s = document.getElementById('tournStatus');
+    s.textContent = 'No Data'; s.className = 'status-pill status-none';
+  }
+  document.getElementById('fantasyWeekLabel').textContent =
+    state.currentTournName ? 'Week ' + state.currentWeek + ' — ' + state.currentTournName : 'Week ' + state.currentWeek;
+}
+
+// ═══ LEADERBOARD TABLE ════════════════════════════════════════════════════════
+// Shows top 10 by default, scrollable; "Show all" expands (fix #3)
+function fmtName(raw) {
+  if (!raw) return '—';
+  const p = raw.split(',');
+  if (p.length >= 2) return '<span title="' + escH(raw) + '">' + p[1].trim() + ' ' + p[0].trim() + '</span>';
+  return escH(raw);
+}
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function meId() { return (_session && !_session.isAdmin) ? _session.id : null; }
+
+// Build a map of player.id -> display label with no conflicts.
+// All players start with standard initials (e.g. "JS").
+// If two players share initials, progressively add more letters from the
+// last name until all labels are unique (e.g. "JSm" vs "JSp").
+function disambiguateInitials(players) {
+  // Parse name into {first, last} parts
+  function parseName(name) {
+    if (!name) return { first: '', last: '' };
+    if (name.includes(',')) {
+      const pts = name.split(',');
+      return { last: pts[0].trim(), first: pts[1].trim() };
+    }
+    const pts = name.trim().split(/\s+/);
+    return { first: pts.slice(0, -1).join(' '), last: pts[pts.length - 1] };
+  }
+
+  // Generate label: first initial + last initial(s)
+  // extraLastChars = how many extra chars to show from last name (0 = just initial)
+  function makeLabel(name, extraLastChars) {
+    const { first, last } = parseName(name);
+    const fi = first ? first[0].toUpperCase() : '';
+    const li = last ? last.slice(0, 1 + extraLastChars).toUpperCase() : '';
+    return fi + li;
+  }
+
+  const ids   = players.map(p => p.id);
+  const names = players.map(p => p.name);
+  const labels = new Array(names.length);
+
+  // Start with 0 extra chars, keep expanding for conflicting labels
+  for (let extra = 0; extra <= 8; extra++) {
+    // Assign labels at this extra level for any still-unresolved players
+    names.forEach((name, i) => {
+      if (labels[i] === undefined) labels[i] = makeLabel(name, extra);
+    });
+
+    // Check for duplicates — find groups sharing the same label
+    const labelCount = {};
+    labels.forEach(l => { labelCount[l] = (labelCount[l] || 0) + 1; });
+
+    // Mark duplicates as undefined so they get expanded next iteration
+    if (extra < 8) {
+      labels.forEach((l, i) => {
+        if (labelCount[l] > 1) labels[i] = undefined;
+      });
+    }
+
+    // If no more duplicates, we're done
+    if (Object.values(labelCount).every(c => c === 1)) break;
+  }
+
+  const result = {};
+  ids.forEach((id, i) => { result[id] = labels[i] || names[i][0].toUpperCase(); });
+  return result;
+}
+
+// Normalise a golfer name to lowercase "last, first" for consistent key matching.
+// Handles both "First Last" and "Last, First" input formats.
+function normName(raw) {
+  if (!raw) return '';
+  const s = raw.trim().toLowerCase();
+  if (s.includes(',')) return s.replace(/,\s+/, ', '); // already "last, first" — normalise spacing
+  // "first last" → "last, first"
+  const parts = s.split(/\s+/);
+  if (parts.length < 2) return s;
+  const last = parts[parts.length - 1];
+  const first = parts.slice(0, parts.length - 1).join(' ');
+  return last + ', ' + first;
+}
+
+let lbShowAll = false;
+function toggleLeaderboardExpand() {
+  lbShowAll = !lbShowAll;
+  document.getElementById('lbToggleBtn').textContent = lbShowAll ? 'Show top 10' : 'Show all';
+  renderLeaderboardTable();
+}
+
+function renderLeaderboardTable() {
+  const el = document.getElementById('pga-leaderboard');
+  if (!state.currentScores) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📄</div>No scores loaded — upload a CSV in the Admin tab.</div>';
+    return;
+  }
+
+  const lbQ = (document.getElementById('lbSearch')?.value || '').trim().toLowerCase();
+  let rows = [...state.currentScores.rows].sort((a,b) => a.posNum - b.posNum || a.score - b.score);
+  if (lbQ) rows = rows.filter(r => r.name.toLowerCase().includes(lbQ));
+  const total = rows.length;
+  if (!lbShowAll && !lbQ) rows = rows.slice(0, 10);
+
+
+  // Build competitor pick sets for current week
+  const wk = state.currentWeek;
+  const wp = state.picks[wk] || {};
+  // Only include competitors who have picks this week
+  const competitors = state.players.filter(p => (wp[p.id] || []).length > 0);
+  // Map: golferName variant (lowercase) -> Set of competitor ids who picked them
+  // Register multiple key variants per name so fuzzy matching works across CSV formats
+  const pickedBy = {};
+  function registerPickKey(key, pid) {
+    const k = key.toLowerCase().trim();
+    if (!k) return;
+    if (!pickedBy[k]) pickedBy[k] = new Set();
+    pickedBy[k].add(pid);
+  }
+  competitors.forEach(p => {
+    (wp[p.id] || []).forEach(rawName => {
+      const n = rawName.trim();
+      registerPickKey(n, p.id);
+      // Also register "First Last" variant if name is "Last, First"
+      if (n.includes(',')) {
+        const parts = n.split(',');
+        registerPickKey(parts[1].trim() + ' ' + parts[0].trim(), p.id);
+        registerPickKey(parts[0].trim(), p.id); // last name only fallback
+      } else {
+        // Register "Last, First" variant if name is "First Last"
+        const parts = n.split(' ');
+        if (parts.length >= 2) {
+          const last = parts[parts.length - 1];
+          const first = parts.slice(0, -1).join(' ');
+          registerPickKey(last + ', ' + first, p.id);
+        }
+      }
+    });
+  });
+
+  const lbLabels = disambiguateInitials(competitors);
+
+  let h = '<div class="scroll-table-wrap" style="max-height:' + (lbShowAll ? '600px' : '340px') + '">';
+  h += '<table class="data-table"><thead><tr>';
+  h += '<th>Pos</th><th>Player</th><th class="r">Score</th><th class="r">Today</th><th>Thru</th>';
+  // Competitor columns — one per person with picks
+  competitors.forEach(p => {
+    const isMe = p.id === meId();
+    h += '<th class="c' + (isMe ? ' my-col-header' : '') + '" title="' + escH(p.name) + '" style="min-width:32px' + (isMe ? ';font-weight:700' : '') + '">' + escH(lbLabels[p.id]) + (isMe ? ' ◀' : '') + '</th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  rows.forEach(r => {
+    const sc = scoreClass(r.score, r.isMC);
+    const mc = r.isMC ? ' <span class="tag tag-red">' + r.posRaw.toUpperCase() + '</span>' : '';
+    const pos = r.isMC ? '' : (r.isTied ? 'T' + r.posNum : String(r.posNum));
+
+    h += '<tr>' +
+      '<td class="text-small ' + (r.posNum === 1 && !r.isTied ? 'rank-1' : 'text-muted') + '">' + pos + '</td>' +
+      '<td>' + fmtName(r.name) + mc + '</td>' +
+      '<td class="r ' + sc + '" style="font-family:var(--mono);font-weight:600">' + r.scoreDisplay + '</td>' +
+      '<td class="r ' + scoreClass(r.today) + '" style="font-family:var(--mono)">' + r.todayDisplay + '</td>' +
+      '<td class="text-small text-muted">' + (r.thru || '—') + '</td>';
+
+    // SG columns removed
+
+    // Competitor pick check columns — try multiple name variants
+    const golferRaw = r.name.trim();
+    const golferKeys = [golferRaw.toLowerCase()];
+    if (golferRaw.includes(',')) {
+      const pts = golferRaw.split(',');
+      golferKeys.push((pts[1].trim() + ' ' + pts[0].trim()).toLowerCase());
+      golferKeys.push(pts[0].trim().toLowerCase());
+    }
+    competitors.forEach(p => {
+      const picked = golferKeys.some(k => pickedBy[k] && pickedBy[k].has(p.id));
+      if (picked) {
+        // MC/WD = red; over par = gold; even = blue; under par = green
+        let ckColor;
+        if (r.isMC)        ckColor = '#e07070';   // red   — missed cut (worst)
+        else if (r.score > 0) ckColor = '#c9a84c'; // gold  — over par
+        else if (r.score === 0) ckColor = '#7eb4f0'; // blue  — even (neutral)
+        else               ckColor = '#5dcc7a';   // green — under par (best)
+        h += '<td class="c" style="font-size:.9rem;font-weight:700;color:' + ckColor + '" title="' + escH(p.name) + ' picked ' + escH(r.name) + ' (' + (r.isMC ? r.posRaw.toUpperCase() : r.scoreDisplay) + ')">✓</td>';
+      } else {
+        h += '<td class="c" style="font-size:.6rem;opacity:.18;color:var(--text-muted);padding:0 3px">·</td>';
+      }
+    });
+
+    h += '</tr>';
+  });
+
+  h += '</tbody></table></div>';
+  if (!lbShowAll && total > 10) {
+    h += '<p class="text-small text-muted" style="text-align:center;margin-top:8px;">Showing top 10 of ' + total + ' — click "Show all" to expand</p>';
+  }
+  if (competitors.length > 0) {
+    h += '<p class="text-small text-muted" style="margin-top:6px;">Columns: ' +
+      competitors.map(p => escH(lbLabels[p.id]) + ' = ' + escH(p.name)).join(' · ') + '</p>';
+  }
+  el.innerHTML = h;
+}
+
+// ═══ FANTASY SCORING (fix #1) ═════════════════════════════════════════════════
+// In golf: LOWER score = BETTER.
+// Rule: best (lowest) score OWES lowPenalty. Worst (highest) score WINS highPrize.
+// "isBest" = lowest numerical total = best fantasy performance = OWES money
+// "isWorst" = highest numerical total = worst fantasy performance = WINS money
+
+function calcMcPenalty(rows) {
+  // Returns the MC floor (pre-major-mult) = 2nd worst made-cut score + 1.
+  // Each MC pick uses max(their actual score, floor) at scoring time.
+  const playing = rows.filter(r => !r.isMC).sort((a,b) => a.score - b.score);
+  if (!playing.length) return 10; // fallback
+  const secondWorst = playing.length >= 2
+    ? playing[playing.length - 2].score
+    : playing[playing.length - 1].score;
+  return secondWorst + 1; // raw floor, no major multiplier applied here
+}
+
+// Per-golfer MC score: max(golfer actual 36-hole score, floor), then apply major mult.
+function mcPenaltyForGolfer(golfer, floor, mult) {
+  // golfer.score is their actual score (negative = under par); null if not recorded.
+  const actual = (golfer && golfer.score !== null && golfer.score !== undefined)
+    ? golfer.score
+    : floor;
+  return Math.max(actual, floor) * mult;
+}
+
+function findGolfer(name, rows) {
+  if (!rows) return null;
+  const n = name.toLowerCase().trim();
+  return rows.find(r => r.name.toLowerCase() === n) ||
+         rows.find(r => r.name.toLowerCase().replace(/,\s*/g,'') === n.replace(/,\s*/g,'')) ||
+         rows.find(r => {
+           // Try matching "First Last" against "Last, First"
+           const parts = r.name.split(',');
+           if (parts.length < 2) return false;
+           const canonical = (parts[1].trim() + ' ' + parts[0].trim()).toLowerCase();
+           return canonical === n || n === parts[0].trim().toLowerCase();
+         }) || null;
+}
+
+function calcWeekResults(wk) {
+  // Calculate fantasy results for a given week using current scores
+  const rows = state.currentScores?.rows;
+  if (rows) rows._isMajor = state.currentScores.isMajor || false;
+  const wp = state.picks[wk] || {};
+  if (!Object.keys(wp).length) return null;
+
+  const mcScore = rows ? calcMcPenalty(rows) : null;
+  const results = [];
+
+  // Build per-competitor golfer usage counts across ALL weeks (current unlocked + locked)
+  // golferUsageByPlayer[playerId][golferNameLower] = count
+  const golferUsageByPlayer = {};
+  function addUsageForPlayer(playerId, golferName) {
+    if (!golferUsageByPlayer[playerId]) golferUsageByPlayer[playerId] = {};
+    const k = golferName.toLowerCase().trim();
+    golferUsageByPlayer[playerId][k] = (golferUsageByPlayer[playerId][k] || 0) + 1;
+  }
+  // Current (unlocked) picks — all weeks in state.picks
+  state.players.forEach(p => {
+    Object.values(state.picks).forEach(weekPicks => {
+      (weekPicks[p.id] || []).forEach(g => addUsageForPlayer(p.id, g));
+    });
+  });
+  // Locked weeks
+  Object.values(state.lockedWeeks).forEach(lw => {
+    lw.results.forEach(r => r.picks.forEach(g => addUsageForPlayer(r.playerId, g)));
+  });
+
+  state.players.forEach(p => {
+    const picks = wp[p.id] || [];
+    if (!picks.length) return;
+
+    let total = null;
+    const playerUsage = golferUsageByPlayer[p.id] || {};
+    const pickDetail = picks.map(name => {
+      if (!rows) return { name, score: null };
+      const usageCount = playerUsage[name.toLowerCase().trim()] || 0;
+      const overUsed = usageCount > state.settings.maxUses;
+      const mult = rows._isMajor ? 2 : 1;
+      if (overUsed) return { name, score: mcPenaltyForGolfer(null, mcScore, mult), mc: true, overUsed: true };
+      const g = findGolfer(name, rows);
+      if (!g) return { name, score: mcPenaltyForGolfer(null, mcScore, mult), mc: true, notFound: true };
+      if (g.isMC) return { name, score: mcPenaltyForGolfer(g, mcScore, mult), mc: true, major: mult===2 };
+      return { name, score: g.score * mult, major: mult===2 };
+    });
+
+    if (rows) total = pickDetail.reduce((s,p) => s + (p.score ?? 0), 0);
+    results.push({ player: p, picks, pickDetail, total });
+  });
+
+  if (!results.length) return null;
+
+  // Determine best/worst with tie splitting
+  const withScores = results.filter(r => r.total !== null);
+  if (withScores.length > 1) {
+    const scores = withScores.map(r => r.total);
+    const bestScore  = Math.min(...scores);
+    const worstScore = Math.max(...scores);
+    const bestCount  = scores.filter(s => s === bestScore).length;
+    const worstCount = scores.filter(s => s === worstScore).length;
+    // Split prize/penalty evenly across tied players, rounded to 2dp
+    const splitPrize   = Math.round((state.settings.highPrize  / bestCount)  * 100) / 100;
+    const splitPenalty = Math.round((state.settings.lowPenalty / worstCount) * 100) / 100;
+    results.forEach(r => {
+      r.isBest  = r.total === bestScore;
+      r.isWorst = r.total === worstScore;
+      r.splitPrize   = r.isBest  ? splitPrize   : 0;
+      r.splitPenalty = r.isWorst ? splitPenalty : 0;
+    });
+  }
+
+  return results.sort((a,b) => (a.total ?? 9999) - (b.total ?? 9999));
+}
+
+function renderWeeklyFantasyScores() {
+  const el = document.getElementById('weekly-scores');
+  const results = calcWeekResults(state.currentWeek);
+  if (!results) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Upload picks &amp; scores CSVs to see results.</div>';
+    return;
+  }
+
+  const rows = state.currentScores?.rows;
+  // Picks revealed once self-entry is closed (deadline passed or toggled off) or scores loaded
+  const picksVisible = isAdmin() || picksAreLocked() || !!rows;
+  const myPlayerId = meId();
+  const mksW = (lbl, col) => mkSortTh(lbl, col, wfsSort, 'sortWfs');
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>#</th>' + mksW('Competitor','name') +
+    (picksVisible ? '<th>Picks</th>' : '') +
+    mksW('Score','total') + mksW('Money','money') +
+    '</tr></thead><tbody>';
+
+  const sortedResults = [...results].sort((a, b) => {
+    if (wfsSort.col === 'money') {
+      const moneyVal = r => r.isBest ? 1 : r.isWorst ? -1 : 0;
+      return wfsSort.dir * (moneyVal(a) - moneyVal(b));
+    }
+    if (wfsSort.col === 'name') return wfsSort.dir * a.player.name.localeCompare(b.player.name);
+    return wfsSort.dir * ((a.total ?? 9999) - (b.total ?? 9999));
+  });
+  sortedResults.forEach((r, i) => {
+    const sc = r.total !== null ? scoreClass(r.total) : '';
+    const wfsMe = r.player.id === myPlayerId;
+
+    let badge = '', money = '—';
+    if (r.isBest) {
+      badge = '<span class="tag tag-green">BEST 🥇</span>';
+      money = '<span class="money-win">+$' + state.settings.highPrize + '</span>';
+    } else if (r.isWorst) {
+      badge = '<span class="tag tag-red">WORST 💸</span>';
+      money = '<span class="money-owe">-$' + state.settings.lowPenalty + '</span>';
+    }
+
+    let pickCell = '';
+    if (picksVisible || wfsMe) {
+      // Show full picks — either scores loaded (week done) or it's their own row
+      const pickDisplay = r.pickDetail.map(pd => {
+        const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.52rem">MC</span>' : '';
+        const nf = pd.notFound ? ' <span class="tag tag-gold" style="font-size:.52rem" title="Not in field — MC floor applied">?</span>' : '';
+        const scoreStr = pd.score !== null ? ' <span class="' + scoreClass(pd.score, pd.mc) + '" style="font-size:.65rem">('+fmtScore(pd.score)+')</span>' : '';
+        return '<span style="color:var(--text-muted)">' + fmtName(pd.name) + mc + nf + scoreStr + '</span>';
+      }).join(', ');
+      pickCell = '<td class="text-small">' + pickDisplay + '</td>';
+    } else if (picksVisible) {
+      pickCell = '<td class="text-small text-muted">—</td>';
+    }
+
+    h += '<tr' + (wfsMe ? ' class="my-row"' : '') + '>' +
+      '<td class="text-small ' + (i === 0 && r.total !== null ? 'rank-1' : 'text-muted') + '">' + (i+1) + '</td>' +
+      '<td>' + (wfsMe ? '<strong>' : '') + escH(r.player.name) + (wfsMe ? '</strong>' : '') + ' ' + badge + '</td>' +
+      (picksVisible ? pickCell : (wfsMe ? pickCell : '')) +
+      '<td class="r ' + sc + '" style="font-family:var(--mono);font-weight:600">' + (r.total !== null ? fmtScore(r.total) : '—') + '</td>' +
+      '<td class="r">' + money + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (!rows) h = '<div class="alert alert-info" style="margin-bottom:10px">Load a scores CSV to calculate fantasy results.</div>' + h;
+  el.innerHTML = h;
+}
+
+// ═══ PLAYER STATS (win picks + made-cut %) ═══════════════════════════════════════
+// Returns map: playerId -> { winPicks, madeCutPicks, totalPicks, madeCutPct }
+// "win pick" = competitor picked the golfer with the lowest score in a locked week
+// (Best proxy for tournament winner given only pick details are stored)
+function computePlayerStats() {
+  var stats = {};
+  function ensureStat(id, name) {
+    if (!stats[id]) stats[id] = { name: name, weekWins: 0, winPicks: 0, madeCutPicks: 0, totalPicks: 0, madeCutPct: null };
+  }
+  Object.values(state.lockedWeeks).forEach(function(lw) {
+    // ── Weekly fantasy wins (best competitor score that week) ──
+    // Find the best (lowest) total among all competitors this week
+    var weekBestTotal = Infinity;
+    lw.results.forEach(function(r) { if (r.total !== null && r.total < weekBestTotal) weekBestTotal = r.total; });
+    if (weekBestTotal !== Infinity) {
+      var weekWinners = lw.results.filter(function(r) { return r.total === weekBestTotal; });
+      var weekWinCredit = 1 / weekWinners.length;
+      weekWinners.forEach(function(r) {
+        ensureStat(r.playerId, r.playerName);
+        stats[r.playerId].weekWins = Math.round((stats[r.playerId].weekWins + weekWinCredit) * 10) / 10;
+      });
+    }
+
+    // ── Tournament champion pick ──
+    var winners = [];
+    if (lw.tournWinners && lw.tournWinners.length) {
+      winners = lw.tournWinners.map(function(w){ return w.toLowerCase().trim(); });
+    } else if (lw.tournWinner) {
+      winners = [lw.tournWinner.toLowerCase().trim()];
+    }
+    var winCredit = winners.length > 0 ? 1 / winners.length : 0; // fractional credit per winner
+
+    lw.results.forEach(function(r) {
+      ensureStat(r.playerId, r.playerName);
+      var st = stats[r.playerId];
+      (r.pickDetail || []).forEach(function(pd) {
+        // notFound picks now score at MC floor — count in total but not made-cut
+        st.totalPicks++;
+        if (!pd.mc && !pd.notFound) st.madeCutPicks++;
+        if (pd.notFound) return; // can't win with a player not in the field
+        // Win pick: check against all tied winners, award fractional credit
+        if (winners.length && pd.name && winCredit > 0) {
+          var pn = pd.name.toLowerCase().trim();
+          var matched = winners.some(function(winner) {
+            if (pn === winner) return true;
+            if (winner.includes(',')) {
+              var pts = winner.split(',');
+              if (pn === (pts[1].trim() + ' ' + pts[0].trim()).toLowerCase()) return true;
+            }
+            if (pn.includes(',')) {
+              var pts2 = pn.split(',');
+              if ((pts2[1].trim() + ' ' + pts2[0].trim()).toLowerCase() === winner) return true;
+            }
+            return false;
+          });
+          if (matched) st.winPicks = Math.round((st.winPicks + winCredit) * 10) / 10;
+        }
+      });
+    });
+  });
+  Object.values(stats).forEach(function(st) {
+    st.madeCutPct = st.totalPicks > 0 ? Math.round((st.madeCutPicks / st.totalPicks) * 100) : null;
+  });
+  return stats;
+}
+
+// ═══ LIVE STANDINGS (locked weeks + current in-progress week) ═════════════════
+function renderLiveStandings() {
+  const el      = document.getElementById('live-standings');
+  const pill    = document.getElementById('liveStandingsPill');
+  const wkLabel = document.getElementById('liveStandingsWkLabel');
+  document.getElementById('liveRulesPrize').textContent   = state.settings.highPrize;
+  document.getElementById('liveRulesPenalty').textContent = state.settings.lowPenalty;
+  wkLabel.textContent = state.currentWeek;
+
+  const lockedWks  = Object.keys(state.lockedWeeks).map(Number).sort((a,b) => a-b);
+  const liveResults = calcWeekResults(state.currentWeek); // null if no picks/scores
+  const hasLive   = !!liveResults;
+  const hasLocked = lockedWks.length > 0;
+
+  if (!hasLocked && !hasLive) {
+    pill.textContent = 'No data'; pill.className = 'status-pill status-none';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📡</div>Load picks &amp; scores to see live standings.</div>';
+    return;
+  }
+
+  pill.textContent = hasLive ? '● Live' : 'Scores not loaded';
+  pill.className   = hasLive ? 'status-pill status-loaded' : 'status-pill status-none';
+  // Auto-expand body when live data present; keep collapsed when only locked weeks
+  const lsBody = document.getElementById('liveStandingsBody');
+  const lsBtn  = document.getElementById('liveToggleBtn');
+  if (lsBody && lsBtn) {
+    lsBody.style.display = hasLive ? '' : 'none';
+    lsBtn.textContent = hasLive ? 'Hide' : 'Show';
+  }
+
+  const playerData = {};
+  const ensurePlayer = (id, name) => {
+    if (!playerData[id]) playerData[id] = { name, lockedTotal: 0, liveTotal: null, weeks: {}, balance: 0 };
+  };
+
+  // Accumulate locked weeks
+  lockedWks.forEach(wk => {
+    const lw = state.lockedWeeks[wk];
+    lw.results.forEach(r => {
+      ensurePlayer(r.playerId, r.playerName);
+      const pd = playerData[r.playerId];
+      pd.lockedTotal += (r.total || 0);
+      pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, live: false };
+      if (r.isBest)  pd.balance += (r.splitPrize   || lw.settings.highPrize);
+      if (r.isWorst) pd.balance -= (r.splitPenalty || lw.settings.lowPenalty);
+    });
+  });
+
+  // Overlay current live week
+  if (liveResults) {
+    liveResults.forEach(r => {
+      ensurePlayer(r.player.id, r.player.name);
+      const pd = playerData[r.player.id];
+      pd.liveTotal = r.total;
+      pd.weeks[state.currentWeek] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, live: true };
+      if (r.isBest)  pd.balance += (r.splitPrize   || state.settings.highPrize);
+      if (r.isWorst) pd.balance -= (r.splitPenalty || state.settings.lowPenalty);
+    });
+  }
+
+  const rows = Object.values(playerData);
+  rows.forEach(r => { r.grandTotal = r.lockedTotal + (r.liveTotal ?? 0); });
+  rows.sort((a,b) => a.grandTotal - b.grandTotal);
+
+  const totals = rows.map(r => r.grandTotal);
+  const minT = Math.min(...totals), maxT = Math.max(...totals);
+  const range = (maxT - minT) || 1;
+  const allWks = [...lockedWks, ...(hasLive ? [state.currentWeek] : [])];
+
+  // Live tourn name for column header
+  const liveTournName = state.currentTournName || ('Week ' + state.currentWeek);
+
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>#</th><th>Competitor</th><th class="r">Balance*</th><th class="r">Total</th>';
+  if (hasLive) h += '<th class="r" title="' + escH(liveTournName) + '">' + escH(liveTournName).slice(0,16) +
+    ' <span class="tag tag-gold" style="font-size:.5rem;vertical-align:middle">live</span></th>';
+  h += '<th class="r">Completed</th></tr></thead><tbody>';
+
+  rows.forEach((r, i) => {
+    const pct = Math.round(((maxT - r.grandTotal) / range) * 100);
+    const barColor = r.grandTotal < 0 ? '#5dcc7a' : r.grandTotal > 0 ? '#e07070' : '#a0b8a8';
+    const liveWd = hasLive ? r.weeks[state.currentWeek] : null;
+    const badge = liveWd ? (liveWd.isBest ? ' 🥇' : liveWd.isWorst ? ' 💸' : '') : '';
+    const bal = r.balance;
+
+    const liveMe = r._id === meId();
+    h += '<tr' + (liveMe ? ' class="my-row"' : '') + '>' +
+      '<td class="' + (i===0?'rank-1':'text-muted text-small') + '">' + (i+1) + '</td>' +
+      '<td><div>' + (liveMe ? '<strong>' : '') + escH(r.name) + (liveMe ? '</strong>' : '') + '</div>' +
+        '<div class="cum-bar-wrap" style="margin-top:3px"><div class="cum-bar-bg">' +
+          '<div class="cum-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div>' +
+        '</div></div></td>' +
+      '<td class="r" style="font-family:var(--mono);font-weight:600">' +
+        (bal === 0 ? '<span class="text-muted">——</span>' : bal > 0 ? '<span class="money-win">+$' + bal + '</span>' : '<span class="money-owe">&minus;$' + Math.abs(bal) + '</span>') +
+      '</td>' +
+      '<td class="r ' + scoreClass(r.grandTotal) + '" style="font-family:var(--mono);font-weight:700">' + fmtScore(r.grandTotal) + '</td>';
+
+    // Live week column
+    if (hasLive) {
+      h += liveWd
+        ? '<td class="r ' + scoreClass(liveWd.total) + '" style="font-family:var(--mono)">' + fmtScore(liveWd.total) + badge + '*</td>'
+        : '<td class="r text-muted text-small">—</td>';
+    }
+
+    // Completed (locked weeks only total)
+    const completedTotal = r.lockedTotal;
+    h += '<td class="r ' + scoreClass(completedTotal) + '" style="font-family:var(--mono);font-size:.8rem">' +
+      (Object.keys(r.weeks).some(w => !r.weeks[w].live) ? fmtScore(completedTotal) : '—') + '</td>';
+
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<p class="text-small text-muted" style="margin-top:8px;">* Live week scores are tentative until locked.</p>';
+  el.innerHTML = h;
+}
+
+// ═══ CUMULATIVE STANDINGS (locked weeks only) ══════════════════════════════════
+function renderCumulativeStandings() {
+  const el = document.getElementById('cumulative-scores');
+  const lockedWks = Object.keys(state.lockedWeeks).map(Number).sort((a,b) => a-b);
+
+  if (!lockedWks.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🏆</div>Lock weeks to build standings.</div>';
+    return;
+  }
+
+  // Build per-player cumulative totals and week-by-week breakdown
+  const playerData = {};
+  state.players.forEach(p => {
+    playerData[p.id] = { name: p.name, total: 0, weeks: {}, balance: 0, bestCount: 0, worstCount: 0 };
+  });
+
+  // Build week ranks: sort each week's results by total asc, assign rank
+  const weekRanks = {};
+  lockedWks.forEach(wk => {
+    const lw = state.lockedWeeks[wk];
+    // Sort by total ascending (lower = better), handle nulls
+    const sorted = [...lw.results].sort(function(a, b) { return (a.total ?? 9999) - (b.total ?? 9999); });
+    weekRanks[wk] = {};
+    sorted.forEach(function(r, idx) { weekRanks[wk][r.playerId] = idx + 1; });
+  });
+
+  lockedWks.forEach(wk => {
+    const lw = state.lockedWeeks[wk];
+    lw.results.forEach(r => {
+      if (!playerData[r.playerId]) {
+        playerData[r.playerId] = { name: r.playerName, total: 0, weeks: {}, balance: 0, bestCount: 0, worstCount: 0 };
+      }
+      const pd = playerData[r.playerId];
+      pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, rank: weekRanks[wk][r.playerId] };
+      pd.total += (r.total || 0);
+      if (r.isBest)  { pd.balance += (r.splitPrize   || state.settings.highPrize);  pd.bestCount++; }
+      if (r.isWorst) { pd.balance -= (r.splitPenalty || state.settings.lowPenalty); pd.worstCount++; }
+    });
+  });
+
+  // Tag each player data entry with its id for stat lookup
+  Object.entries(playerData).forEach(function(kv) { kv[1]._id = kv[0]; });
+  // Attach stats for sorting
+  const pStats2pre = computePlayerStats();
+  const rows = Object.values(playerData).filter(p => Object.keys(p.weeks).length > 0);
+  rows.forEach(r => {
+    const st = pStats2pre[r._id] || {};
+    r._weekWins   = st.weekWins   || 0;
+    r._champPicks = st.winPicks   || 0;
+    r._madeCutPct = st.madeCutPct || 0;
+  });
+  const cumSortFn = (a, b) => {
+    let av, bv;
+    if (cumSort.col === 'total')      { av = a.total;      bv = b.total; }
+    else if (cumSort.col === 'balance')  { av = a.balance;    bv = b.balance; }
+    else if (cumSort.col === 'weekWins') { av = a._weekWins;  bv = b._weekWins; }
+    else if (cumSort.col === 'champPicks') { av = a._champPicks; bv = b._champPicks; }
+    else if (cumSort.col === 'madeCutPct') { av = a._madeCutPct; bv = b._madeCutPct; }
+    else if (cumSort.col === 'name')         { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
+    else if (cumSort.col.startsWith('wk_')) {
+      const wkNum = parseInt(cumSort.col.slice(3));
+      av = (a.weeks[wkNum] ? a.weeks[wkNum].total : 9999);
+      bv = (b.weeks[wkNum] ? b.weeks[wkNum].total : 9999);
+    }
+    else { av = a.total; bv = b.total; }
+    return cumSort.dir * ((av > bv ? 1 : av < bv ? -1 : 0));
+  };
+  rows.sort(cumSortFn);
+
+  // For bar chart: find score range
+  const totals = rows.map(r => r.total);
+  const minT = Math.min(...totals), maxT = Math.max(...totals);
+  const range = (maxT - minT) || 1;
+
+  // Reverse week order: most recent first
+  const wksDesc = [...lockedWks].reverse();
+
+  const pStats2 = pStats2pre; // already computed for sorting
+  const mks = (lbl, col, cls) => mkSortTh(lbl, col, cumSort, 'sortCum', cls);
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>#</th>' + mks('Competitor','name','') +
+    mks('Balance','balance') + mks('Total','total') +
+    mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct');
+  wksDesc.forEach(wk => {
+    const lw = state.lockedWeeks[wk];
+    const short = escH(lw.tournName).slice(0,14);
+    h += mkSortTh(short, 'wk_'+wk, cumSort, 'sortCum', 'hide-md');
+  });
+  h += '</tr></thead><tbody>';
+
+  rows.forEach((r, i) => {
+    const pct = Math.round(((maxT - r.total) / range) * 100);
+    const barColor = r.total < 0 ? '#5dcc7a' : r.total > 0 ? '#e07070' : '#a0b8a8';
+
+    const bal = r.balance;
+    const cumMe = r._id === meId();
+    h += '<tr' + (cumMe ? ' class="my-row"' : '') + '>' +
+      '<td class="' + (i === 0 ? 'rank-1' : 'text-muted text-small') + '">' + (i+1) + '</td>' +
+      '<td>' +
+        '<div>' + (cumMe ? '<strong>' : '') + escH(r.name) + (cumMe ? '</strong>' : '') + '</div>' +
+        '<div class="cum-bar-wrap" style="margin-top:4px;">' +
+          '<div class="cum-bar-bg"><div class="cum-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
+        '</div>' +
+      '</td>' +
+      '<td class="r" style="font-family:var(--mono);font-weight:600">' +
+        (bal === 0 ? '<span class="text-muted">——</span>' : bal > 0 ? '<span class="money-win">+$' + bal + '</span>' : '<span class="money-owe">−$' + Math.abs(bal) + '</span>') +
+      '</td>' +
+      '<td class="r ' + scoreClass(r.total) + '" style="font-family:var(--mono);font-weight:700">' + fmtScore(r.total) + '</td>';
+
+    // stat cells — before weekly columns
+    const cSt = pStats2[r._id];
+    const fmtStat = v => v === 0 ? '0' : Number.isInteger(v) ? v : v.toFixed(1);
+    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.weekWins) : '—') + '</td>';
+    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.winPicks) : '—') + '</td>';
+    h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt && cSt.madeCutPct !== null ? cSt.madeCutPct + '%' : '—') + '</td>';
+
+    wksDesc.forEach(wk => {
+      const wd = r.weeks[wk];
+      if (!wd) { h += '<td class="r text-muted hide-md">—</td>'; return; }
+      const badge = wd.isBest ? ' 🥇' : wd.isWorst ? ' 💸' : '';
+      const rankStr = wd.rank ? ' <em style="font-size:.62rem;opacity:.7;font-style:italic;">(' + wd.rank + ')</em>' : '';
+      h += '<td class="r hide-md ' + scoreClass(wd.total) + '" style="font-family:var(--mono);font-size:.72rem">' +
+        fmtScore(wd.total) + rankStr + badge + '</td>';
+    });
+
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+
+  // Summary bar below
+  h += '<div style="margin-top:14px;font-family:var(--mono);font-size:.7rem;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap;">' +
+    '<span>🥇 Best weekly score wins $' + state.settings.highPrize + '</span>' +
+    '<span>💸 Worst weekly score owes $' + state.settings.lowPenalty + '</span>' +
+    '<span>🏆 Wins = best weekly score (partial for ties) · 🎯 Champ = picked tournament champion</span>' +
+    '<span>' + lockedWks.length + ' week' + (lockedWks.length!==1?'s':'') + ' locked</span>' +
+    '</div>';
+
+  el.innerHTML = h;
+  renderMoneyTable();
+}
+
+function renderMoneyTable() {
+  const el = document.getElementById('money-table');
+  const rows = [];
+  Object.entries(state.lockedWeeks).forEach(([wk, lw]) => {
+    lw.results.forEach(r => {
+      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🥇 Best score prize' + (r.splitPrize && r.splitPrize !== lw.settings.highPrize ? ' (split)' : ''), amt: (r.splitPrize || lw.settings.highPrize), tourn: lw.tournName });
+      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score penalty' + (r.splitPenalty && r.splitPenalty !== lw.settings.lowPenalty ? ' (split)' : ''), amt: -(r.splitPenalty || lw.settings.lowPenalty), tourn: lw.tournName });
+    });
+  });
+  if (!rows.length) { el.innerHTML = '<div class="empty">No locked weeks yet.</div>'; return; }
+  const mksM = (lbl, col) => mkSortTh(lbl, col, moneySort, 'sortMoney');
+  let h = '<table class="data-table"><thead><tr>' +
+    mksM('Wk','wk') + mksM('Tournament','tourn') + mksM('Competitor','name') +
+    '<th>Event</th>' + mksM('Amount','amt') + '</tr></thead><tbody>';
+  rows.sort((a,b) => {
+    if (moneySort.col === 'name')  return moneySort.dir * a.name.localeCompare(b.name);
+    if (moneySort.col === 'tourn') return moneySort.dir * a.tourn.localeCompare(b.tourn);
+    if (moneySort.col === 'amt')   return moneySort.dir * (a.amt - b.amt);
+    return moneySort.dir * (a.wk - b.wk);
+  }).forEach(r => {
+    h += '<tr>' +
+      '<td class="text-small">' + r.wk + '</td>' +
+      '<td class="text-small text-muted">' + escH(r.tourn) + '</td>' +
+      '<td>' + escH(r.name) + '</td>' +
+      '<td class="text-small">' + r.desc + '</td>' +
+      '<td class="r ' + (r.amt >= 0 ? 'money-win' : 'money-owe') + '" style="font-family:var(--mono)">' +
+        (r.amt >= 0 ? '+$' + r.amt : '−$' + Math.abs(r.amt)) + '</td></tr>';
+  });
+  el.innerHTML = h + '</tbody></table>';
+}
+
+// ═══ WEEK HISTORY TAB (fix #6) ════════════════════════════════════════════════
+// Each locked week stores: {tournName, results:[{playerId, playerName, picks:[str],
+//   pickDetail:[{name,score,mc}], total, isBest, isWorst}]}
+
+function renderWeekHistory() {
+  const pills = document.getElementById('weekPills');
+  const lockedWks = Object.keys(state.lockedWeeks).map(Number).sort((a,b) => a - b);
+  if (!lockedWks.length) {
+    pills.innerHTML = '';
+    document.getElementById('history-detail').innerHTML = '<div class="empty"><div class="empty-icon">📅</div>No locked weeks yet.</div>';
+    return;
+  }
+  pills.innerHTML = lockedWks.map(wk =>
+    '<span class="week-pill" id="pill-'+wk+'" onclick="showWeekHistory('+wk+')">' +
+    'Wk' + wk + ' – ' + escH(state.lockedWeeks[wk].tournName) + '</span>'
+  ).join('');
+  // Auto-select most recent
+  showWeekHistory(lockedWks[lockedWks.length - 1]);
+}
+
+function showWeekHistory(wk) {
+  document.querySelectorAll('.week-pill').forEach(p => p.classList.remove('active'));
+  const pill = document.getElementById('pill-' + wk);
+  if (pill) pill.classList.add('active');
+
+  const lw = state.lockedWeeks[wk];
+  if (!lw) return;
+
+  const el = document.getElementById('history-detail');
+  const sorted = [...lw.results].sort((a,b) => {
+    if (histSort.col === 'name')  return histSort.dir * a.playerName.localeCompare(b.playerName);
+    if (histSort.col === 'money') return histSort.dir * ((b.isBest?1:b.isWorst?-1:0) - (a.isBest?1:a.isWorst?-1:0));
+    return histSort.dir * ((a.total??9999) - (b.total??9999));
+  });
+
+  let h = '<div style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted);margin-bottom:12px;">' +
+    'Week ' + wk + ' · ' + escH(lw.tournName) + ' · Locked ' + (lw.lockedAt || '') + '</div>';
+
+  const mksH = (lbl, col) => mkSortTh(lbl, col, histSort, 'sortHist');
+  h += '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>#</th>' + mksH('Competitor','name') + '<th>Picks &amp; Scores</th>' +
+    mksH('Total','total') + mksH('Money','money') +
+    '</tr></thead><tbody>';
+
+  sorted.forEach((r, i) => {
+    let badge = '', money = '—';
+    if (r.isBest)  { badge = '<span class="tag tag-green">BEST 🥇</span>';  money = '<span class="money-win">+$' + lw.settings.highPrize + '</span>'; }
+    if (r.isWorst) { badge = '<span class="tag tag-red">WORST 💸</span>';   money = '<span class="money-owe">-$' + lw.settings.lowPenalty + '</span>'; }
+
+    const pickDisplay = (r.pickDetail || r.picks.map(p => ({name:p, score:null}))).map(pd => {
+      const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.5rem">MC</span>' : '';
+      const sc = pd.score !== null ? ' <span class="' + scoreClass(pd.score, pd.mc) + '" style="font-size:.64rem">('+fmtScore(pd.score)+')</span>' : '';
+      return fmtName(pd.name) + mc + sc;
+    }).join('<span style="color:var(--card-border)"> · </span>');
+
+    const histMe = r.playerId === meId();
+    h += '<tr' + (histMe ? ' class="my-row"' : '') + '>' +
+      '<td class="' + (i===0?'rank-1':'text-muted text-small') + '">' + (i+1) + '</td>' +
+      '<td>' + (histMe ? '<strong>' : '') + escH(r.playerName) + (histMe ? '</strong>' : '') + ' ' + badge + '</td>' +
+      '<td class="text-small">' + pickDisplay + '</td>' +
+      '<td class="r ' + scoreClass(r.total) + '" style="font-family:var(--mono);font-weight:600">' + fmtScore(r.total) + '</td>' +
+      '<td class="r">' + money + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+
+  // MC penalty note
+  if (lw.mcScore !== undefined) {
+    h += '<p class="text-small text-muted" style="margin-top:8px;">MC floor: ' + fmtScore(lw.mcScore) + ' (each MC pick scored at max(actual, floor)).</p>';
+  }
+
+  el.innerHTML = h;
+}
+
+// ═══ FIELD TAB ════════════════════════════════════════════════════════════════
+let fieldSort    = { col: 'owgr', dir: 1 };
+let cumSort      = { col: 'total', dir: 1 };
+let histSort     = { col: 'total', dir: 1 };
+let wfsSort      = { col: 'total', dir: 1 };
+let moneySort    = { col: 'wk', dir: -1 };
+
+function mkSortTh(label, col, sortObj, renderFn, extraCls) {
+  const active = sortObj.col === col;
+  const arrow  = sortObj.dir === 1 ? ' ↑' : ' ↓';
+  const cls    = 'sortable r' + (active ? ' sort-active' : '') + (extraCls ? ' ' + extraCls : '');
+  return '<th class="' + cls + '" onclick="' + renderFn + '(\'' + col + '\')" style="cursor:pointer;">' +
+    label + (active ? arrow : '') + '</th>';
+}
+let fieldView = 'field'; // 'field' = current player list, 'all' = all ever picked
+
+function setFieldView(v) {
+  fieldView = v;
+  const fBtn = document.getElementById('fieldToggleField');
+  const aBtn = document.getElementById('fieldToggleAll');
+  if (fBtn) { fBtn.className = v === 'field' ? 'btn btn-sm' : 'btn-ghost btn-sm'; }
+  if (aBtn) { aBtn.className = v === 'all'   ? 'btn btn-sm' : 'btn-ghost btn-sm'; }
+  renderFieldTable();
+}
+
+function renderFieldTable() {
+  const el = document.getElementById('field-table'), cnt = document.getElementById('fieldCount');
+  if (!state.playerList.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌍</div>No player list loaded.</div>';
+    cnt.textContent = ''; return;
+  }
+  document.getElementById('fieldUploadHint').style.display = 'none';
+
+  // Count selections across all weeks: current pending picks + all locked weeks
+  const sel = {};
+  function addSelCount(golferName, playerName) {
+    // Normalise to a single canonical key so "J.J. Spaun" and "Spaun, J.J." always merge
+    const k = normName(golferName);
+    if (!sel[k]) sel[k] = { total: 0, byPlayer: {} };
+    sel[k].total++;
+    sel[k].byPlayer[playerName] = (sel[k].byPlayer[playerName] || 0) + 1;
+  }
+  // Current (unlocked) picks
+  state.players.forEach(p => {
+    Object.values(state.picks).forEach(wk => {
+      (wk[p.id] || []).forEach(g => addSelCount(g, p.name));
+    });
+  });
+  // Locked weeks (picks are deleted from state.picks when locked, so count separately)
+  Object.values(state.lockedWeeks).forEach(lw => {
+    lw.results.forEach(r => {
+      r.picks.forEach(g => addSelCount(g, r.playerName));
+    });
+  });
+
+  const q = (document.getElementById('fieldSearch').value || '').trim().toLowerCase();
+
+  // Build player source based on toggle
+  let playerSource;
+  if (fieldView === 'all') {
+    // All unique golfer names ever picked (current + locked weeks)
+    const allNames = {};
+    state.players.forEach(p => {
+      Object.values(state.picks).forEach(wk => {
+        (wk[p.id] || []).forEach(g => { allNames[g] = allNames[g] || { owgr_rank: 9999, player_name: g }; });
+      });
+    });
+    Object.values(state.lockedWeeks).forEach(lw => {
+      lw.results.forEach(r => {
+        r.picks.forEach(g => { allNames[g] = allNames[g] || { owgr_rank: 9999, player_name: g }; });
+      });
+    });
+    // Build a variant→canonical map from playerList + owgrList so picks in
+    // "First Last" format resolve to the correct ranked entry
+    const rankSource = state.owgrList.length ? state.owgrList : state.playerList;
+    const canonMap = {}; // lowercase variant → canonical player object
+    rankSource.forEach(p => {
+      const n = p.player_name;
+      canonMap[n.toLowerCase()] = p;
+      // Also register First Last variant
+      if (n.includes(',')) {
+        const pts = n.split(',');
+        canonMap[(pts[1].trim() + ' ' + pts[0].trim()).toLowerCase()] = p;
+      }
+    });
+    // Resolve each pick name to its canonical entry, fall back to owgr 9999
+    Object.keys(allNames).forEach(function(pickName) {
+      const canonical = canonMap[pickName.toLowerCase()];
+      if (canonical) {
+        allNames[pickName] = canonical; // replace stub with real ranked entry
+      }
+    });
+    // Also add all ranked players even if not picked
+    rankSource.forEach(p => { if (!allNames[p.player_name]) allNames[p.player_name] = p; });
+    // Deduplicate by canonical player_name
+    const deduped = {};
+    Object.values(allNames).forEach(p => { deduped[p.player_name.toLowerCase()] = p; });
+    playerSource = Object.values(deduped);
+  } else {
+    playerSource = state.playerList;
+  }
+
+  let rows = playerSource.map(p => ({
+    owgr: p.owgr_rank, name: p.player_name,
+    total: (() => {
+      const s = sel[normName(p.player_name)] || {};
+      return s.total || 0;
+    })(),
+    byPlayer: (() => {
+      const s = sel[normName(p.player_name)] || {};
+      return s.byPlayer || {};
+    })(),
+  }));
+  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  rows.sort((a,b) => {
+    let av, bv;
+    if (fieldSort.col.startsWith('player:')) {
+      const pname = fieldSort.col.slice(7);
+      av = a.byPlayer[pname] || 0;
+      bv = b.byPlayer[pname] || 0;
+    } else {
+      av = a[fieldSort.col]; bv = b[fieldSort.col];
+      if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    }
+    return fieldSort.dir * (av > bv ? 1 : av < bv ? -1 : 0);
+  });
+  cnt.textContent = rows.length + ' players' + (q ? ' (filtered)' : '');
+
+  const ar = d => d === 1 ? '↑' : '↓';
+  const th = (lbl, col) => {
+    const act = fieldSort.col === col ? 'sort-active' : '';
+    return '<th class="sortable ' + act + '" onclick="sortField(\'' + col + '\')">' + lbl +
+      ' <span style="opacity:' + (fieldSort.col===col?1:.4) + '">' + ar(fieldSort.col===col?fieldSort.dir:1) + '</span></th>';
+  };
+
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    th('OWGR','owgr') + th('Player','name');
+  const fieldLabels = disambiguateInitials(state.players);
+  state.players.forEach(p => {
+    const isMe   = p.id === meId();
+    const colKey = 'player:' + p.name;
+    const active = fieldSort.col === colKey;
+    const arrow  = active ? (' ' + (fieldSort.dir === -1 ? '\u2191' : '\u2193')) : '';
+    const cls    = 'r text-small sortable' + (isMe ? ' my-col-header' : '') + (active ? ' sort-active' : '');
+    h += '<th class="' + cls + '" title="' + escH(p.name) + '" onclick="sortField(\'' + colKey + '\')">' +
+      escH(fieldLabels[p.id]) + (isMe ? ' \u25c4' : '') + arrow + '</th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  rows.forEach(r => {
+    h += '<tr><td class="text-small text-muted" style="font-family:var(--mono)">' + r.owgr + '</td>' +
+      '<td>' + fmtName(r.name) + '</td>';
+    state.players.forEach(p => {
+      const c = r.byPlayer[p.name] || 0;
+      const cls = c >= state.settings.maxUses ? 'usage-max' : c >= 2 ? 'usage-warn' : c > 0 ? 'usage-ok' : 'text-muted';
+      h += '<td class="r text-small ' + cls + '" style="font-family:var(--mono)">' + (c || '—') + '</td>';
+    });
+    h += '</tr>';
+  });
+  el.innerHTML = h + '</tbody></table></div>';
+}
+function sortCum(col) {
+  cumSort.dir = cumSort.col === col ? -cumSort.dir : 1;
+  cumSort.col = col;
+  renderCumulativeStandings();
+}
+function sortWfs(col) {
+  wfsSort.dir = wfsSort.col === col ? -wfsSort.dir : 1;
+  wfsSort.col = col;
+  renderWeeklyFantasyScores();
+}
+function sortMoney(col) {
+  moneySort.dir = moneySort.col === col ? -moneySort.dir : 1;
+  moneySort.col = col;
+  renderMoneyTable();
+}
+function sortHist(col) {
+  histSort.dir = histSort.col === col ? -histSort.dir : 1;
+  histSort.col = col;
+  // Re-render last selected week
+  const active = document.querySelector('.week-pill.active');
+  if (active) showWeekHistory(parseInt(active.id.replace('pill-','')));
+}
+function sortField(col) {
+  if (fieldSort.col === col) {
+    fieldSort.dir *= -1;
+  } else {
+    fieldSort.col = col;
+    // owgr/name default ascending, player counts default descending (most picked first)
+    fieldSort.dir = (col === 'owgr' || col === 'name') ? 1 : -1;
+  }
+  renderFieldTable();
+}
+
+// ═══ ADMIN — LOCK WEEK ════════════════════════════════════════════════════════
+function renderAdminWeekScores() {
+  const el = document.getElementById('admin-week-scores');
+  const wk = state.currentWeek;
+  ['lockWeekNum','lockWeekNum2'].forEach(id => document.getElementById(id).textContent = wk);
+
+  const results = calcWeekResults(wk);
+  if (!results) {
+    el.innerHTML = '<div class="empty">Upload picks and scores CSVs to see results.</div>'; return;
+  }
+
+  let h = '<table class="data-table"><thead><tr>' +
+    '<th>Competitor</th><th>Picks</th><th class="r">Score</th><th class="r">Money</th>' +
+    '</tr></thead><tbody>';
+  results.forEach(r => {
+    let money = '—';
+    if (r.isBest)  money = '<span class="money-win">+$' + state.settings.highPrize + '</span>';
+    if (r.isWorst) money = '<span class="money-owe">-$' + state.settings.lowPenalty + '</span>';
+    h += '<tr><td>' + escH(r.player.name) + '</td>' +
+      '<td class="text-small text-muted">' + r.pickDetail.map(pd => fmtName(pd.name)).join(', ') + '</td>' +
+      '<td class="r ' + (r.total!==null?scoreClass(r.total):'') + '" style="font-family:var(--mono)">' + (r.total!==null?fmtScore(r.total):'—') + '</td>' +
+      '<td class="r">' + money + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  if (!state.currentScores) h = '<div class="alert alert-warn" style="margin-bottom:9px">Load a scores CSV to calculate results.</div>' + h;
+  el.innerHTML = h;
+  return results;
+}
+
+function lockCurrentWeek() {
+  if (!state.currentScores) { toast('Load scores first', 'warn'); return; }
+
+  // Determine which week to lock — current or a selected prior week
+  const lkSel = document.getElementById('lockWeekSelect');
+  const wk = (lkSel && lkSel.value !== 'current') ? parseInt(lkSel.value, 10) : state.currentWeek;
+
+  // For prior weeks, temporarily use that week's picks if they exist
+  const targetPicks = state.picks[wk] || {};
+  const hasTargetPicks = Object.keys(targetPicks).length > 0;
+  if (!hasTargetPicks) { toast('No picks loaded for Week ' + wk, 'warn'); return; }
+
+  const results = calcWeekResults(wk);
+  if (!results || !results.length) { toast('No picks to lock for Week ' + wk, 'warn'); return; }
+
+  const rows = state.currentScores.rows;
+  const mcScore = calcMcPenalty(rows);
+
+  // Store full detail (fix #6) — including pick-by-pick scores and tournament name
+  // Find the actual tournament winner: player listed at position 1 in the CSV.
+  // In a playoff, the winner has posNum===1 while others have posNum===2 at same score.
+  // First try posNum===1 exactly; if not found (e.g. all tied T1), fall back to lowest score.
+  const nonMC = state.currentScores.rows.filter(function(rr) { return !rr.isMC; });
+  // Find winner(s): solo posNum===1, or all T1 tied players
+  let winnerRows = nonMC.filter(function(rr) { return rr.posNum === 1 && !rr.isTied; });
+  if (!winnerRows.length) {
+    // Tied or no explicit solo winner — take all at posNum===1
+    const minPos = Math.min.apply(null, nonMC.map(function(rr){ return rr.posNum; }));
+    winnerRows = nonMC.filter(function(rr) { return rr.posNum === minPos; });
+  }
+  const tournWinner  = winnerRows.length === 1 ? winnerRows[0].name : null; // legacy single
+  const tournWinners = winnerRows.map(function(rr){ return rr.name; });     // array for fractional
+
+  state.lockedWeeks[wk] = {
+    tournName: state.currentTournName || state.currentScores.tournName,
+    tournWinner: tournWinner,
+    tournWinners: tournWinners,
+    lockedAt: new Date().toLocaleString(),
+    mcScore,
+    settings: { lowPenalty: state.settings.lowPenalty, highPrize: state.settings.highPrize },
+    results: results.map(r => ({
+      playerId: r.player.id,
+      playerName: r.player.name,
+      picks: r.picks,
+      pickDetail: r.pickDetail,
+      total: r.total,
+      isBest: r.isBest || false,
+      isWorst: r.isWorst || false,
+      splitPrize: r.splitPrize || 0,
+      splitPenalty: r.splitPenalty || 0,
+    }))
+  };
+
+  // Clear locked week's picks
+  delete state.picks[wk];
+  // Only advance the current week pointer if we just locked the current week
+  if (wk === state.currentWeek) {
+    state.currentWeek = wk + 1;
+    state.currentScores = null;
+    state.currentTournName = '';
+    state.currentRound = '';
+  }
+  // If locking a prior week, keep scores loaded (might need to lock another)
+  saveState();
+  renderAll();
+  toast('Week ' + wk + ' locked! Now on week ' + state.currentWeek + '.', 'success');
+}
+
+function winnerNameMatches(pickName, winnerName) {
+  if (!pickName || !winnerName) return false;
+  var pn = pickName.toLowerCase().trim();
+  var wn = winnerName.toLowerCase().trim();
+  if (pn === wn) return true;
+  // winner is "Last, First" → compare against "First Last"
+  if (wn.includes(',')) {
+    var pts = wn.split(',');
+    if (pn === (pts[1].trim() + ' ' + pts[0].trim()).toLowerCase()) return true;
+  }
+  // pick is "Last, First" → compare against winner as "First Last"
+  if (pn.includes(',')) {
+    var pts2 = pn.split(',');
+    if ((pts2[1].trim() + ' ' + pts2[0].trim()).toLowerCase() === wn) return true;
+  }
+  return false;
+}
+
+function renderStateDebug() {
+  const el = document.getElementById('stateDebug');
+  if (!el) return;
+  const rows = [
+    ['currentWeek',       state.currentWeek],
+    ['currentTournName',  state.currentTournName || '(empty)'],
+    ['currentRound',      state.currentRound || '(empty)'],
+    ['currentScores',     state.currentScores ? state.currentScores.tournName + ' (' + (state.currentScores.rows||[]).length + ' rows)' : 'null'],
+    ['picksOpen',         state.picksOpen],
+    ['pickDeadline',      state.pickDeadline || 'null'],
+    ['playerList.length', state.playerList.length],
+    ['owgrList.length',   (state.owgrList||[]).length],
+    ['players.length',    state.players.length],
+    ['lockedWeeks',       Object.keys(state.lockedWeeks).join(', ') || '(none)'],
+    ['auditLog.length',   (state.auditLog||[]).length],
+  ];
+  el.innerHTML = rows.map(function(r) {
+    return '<div><span style="color:var(--text-muted);display:inline-block;width:180px;">' + r[0] + '</span>' +
+      '<strong>' + escH(String(r[1])) + '</strong></div>';
+  }).join('');
+}
+
+function toggleWinnerSection() {
+  const sec = document.getElementById('winnerSection');
+  const btn = document.getElementById('winnerCollapseBtn');
+  if (!sec || !btn) return;
+  const open = sec.style.display !== 'none';
+  sec.style.display = open ? 'none' : '';
+  btn.textContent = open ? 'Show' : 'Hide';
+}
+
+function renderWinnerDebug() {
+  const el = document.getElementById('winnerDebug');
+  if (!el) return;
+  const lockedWks = Object.keys(state.lockedWeeks).map(Number).sort((a,b) => a-b);
+  if (!lockedWks.length) { el.innerHTML = '<div class="empty">No locked weeks yet.</div>'; return; }
+
+  let h = '';
+  lockedWks.forEach(function(wk) {
+    const lw = state.lockedWeeks[wk];
+    const stored = lw.tournWinner || '';
+
+    // Suggestion source: full player list if loaded, otherwise fall back to pick names
+    var suggestionNames = [];
+    if (state.playerList && state.playerList.length) {
+      // playerList has all players in the field — use these
+      suggestionNames = state.playerList.map(function(p) { return p.player_name; });
+    } else {
+      // fallback: only names that were actually picked
+      lw.results.forEach(function(r) {
+        (r.pickDetail || r.picks.map(function(p){ return { name: p }; })).forEach(function(pd) {
+          if (pd.name && !suggestionNames.includes(pd.name)) suggestionNames.push(pd.name);
+        });
+      });
+    }
+    suggestionNames.sort();
+    const dlId = 'dl_wk_' + wk;
+
+    h += '<div style="margin-bottom:18px;padding:12px 14px;background:rgba(0,0,0,.25);border-radius:6px;border-left:3px solid ' + (stored ? 'var(--green-light)' : 'var(--red)') + ';">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
+    h += '<strong style="font-size:.8rem;">Wk' + wk + ' — ' + escH(lw.tournName) + '</strong>';
+    h += '<span style="color:' + (stored ? '#5dcc7a' : '#e07070') + ';font-size:.7rem;">' + (stored ? '✓ Winner set' : '⚠ No winner set') + '</span>';
+    h += '</div>';
+
+    // Input row
+    h += '<datalist id="' + dlId + '">';
+    suggestionNames.forEach(function(n) { h += '<option value="' + escH(n) + '">'; });
+    h += '</datalist>';
+    h += '<div class="flex" style="gap:8px;margin-bottom:10px;">';
+    h += '<input type="text" id="winnerInput_' + wk + '" value="' + escH(stored) + '" placeholder="e.g. Last, First" list="' + dlId + '" style="max-width:260px;" />';
+    h += '<button class="btn btn-sm" onclick="saveWinner(' + wk + ')">Save</button>';
+    h += '<button class="btn-ghost btn-sm" onclick="clearWinner(' + wk + ')">Clear</button>';
+    h += '</div>';
+
+    // Match preview
+    if (stored) {
+      h += '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:4px;">Pick matches:</div>';
+      lw.results.forEach(function(r) {
+        var matchedPicks = (r.pickDetail || r.picks.map(function(p){ return { name: p }; }))
+          .filter(function(pd) { return winnerNameMatches(pd.name, stored); });
+        if (matchedPicks.length) {
+          h += '<div style="color:#5dcc7a;font-size:.72rem;">✓ ' + escH(r.playerName) + ' picked <strong>' + escH(matchedPicks[0].name) + '</strong></div>';
+        }
+      });
+      var anyMatch = lw.results.some(function(r) {
+        return (r.pickDetail || r.picks.map(function(p){ return {name:p}; })).some(function(pd) {
+          return winnerNameMatches(pd.name, stored);
+        });
+      });
+      if (!anyMatch) {
+        h += '<div style="color:#e07070;font-size:.72rem;">⚠ No picks matched "' + escH(stored) + '" — check spelling/format</div>';
+      }
+    }
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
+
+function saveWinner(wk) {
+  const inp = document.getElementById('winnerInput_' + wk);
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!state.lockedWeeks[wk]) return;
+  state.lockedWeeks[wk].tournWinner = val || null;
+  saveState();
+  renderWinnerDebug();
+  renderCumulativeStandings();
+  toast('Winner saved for Week ' + wk + (val ? ': ' + val : ' (cleared)'), val ? 'success' : 'warn');
+}
+
+function clearWinner(wk) {
+  if (!state.lockedWeeks[wk]) return;
+  state.lockedWeeks[wk].tournWinner = null;
+  saveState();
+  renderWinnerDebug();
+  renderCumulativeStandings();
+  toast('Winner cleared for Week ' + wk, 'warn');
+}
+
+function refreshGateDropdown() {
+  // Update the name dropdown on the site gate without showing it
+  const sel = document.getElementById('gateNameSelect');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— select your name —</option><option value="__admin__">Admin</option>';
+  state.players.forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  sel.value = current; // preserve selection if still valid
+}
+
+function addCompetitor() {
+  const nameEl = document.getElementById('newCompetitorName');
+  const pinEl  = document.getElementById('newCompetitorPin');
+  const name = (nameEl.value || '').trim();
+  const pin  = (pinEl.value  || '').trim();
+
+  if (!name) { toast('Enter a name', 'warn'); nameEl.focus(); return; }
+  if (pin && !/^\d{4}$/.test(pin)) { toast('PIN must be exactly 4 digits', 'warn'); pinEl.focus(); return; }
+
+  // Prevent duplicate names
+  const dupe = state.players.find(function(p) {
+    return p.name.toLowerCase() === name.toLowerCase();
+  });
+  if (dupe) { toast('"' + name + '" already exists', 'warn'); return; }
+
+  const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  state.players.push({ id: id, name: name, pin: pin || '' });
+  saveState();
+  renderCompetitorList();
+  refreshGateDropdown();
+  renderPicksLoginDropdown();
+  nameEl.value = '';
+  pinEl.value  = '';
+  nameEl.focus();
+  toast('Added ' + name + (pin ? ' with PIN' : ' — set a PIN before sharing'), pin ? 'success' : 'warn');
+}
+
+function renderCompetitorList() {
+  const el = document.getElementById('competitorList');
+  if (!el) return;
+  if (!state.players.length) {
+    el.innerHTML = '<div class="empty" style="padding:10px">No competitors loaded yet.</div>';
+    return;
+  }
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>Competitor</th><th>PIN</th><th style="width:40px;"></th></tr></thead><tbody>';
+  state.players.forEach(function(p) {
+    h += '<tr>' +
+      '<td style="font-family:var(--mono);font-size:.8rem;">' + escH(p.name) + '</td>' +
+      '<td><div style="display:flex;gap:6px;align-items:center;">' +
+        '<input type="text" id="pin_' + p.id + '" value="' + escH(p.pin||'') + '" maxlength="4" ' +
+          'placeholder="0000" style="width:70px;letter-spacing:.15em;font-size:.8rem;" />' +
+        '<button class="btn btn-sm" onclick="savePin(' + "'" + p.id + "'" + ')">Save</button>' +
+      '</div></td>' +
+      '<td><button onclick="removeCompetitor(' + "'" + p.id + "'" + ')" ' +
+        'style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem;" ' +
+        'title="Remove">&#x2715;</button></td>' +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+}
+
+function savePin(id) {
+  const inp = document.getElementById('pin_' + id);
+  if (!inp) return;
+  const pin = inp.value.trim();
+  if (pin && !/^\d{4}$/.test(pin)) { toast('PIN must be exactly 4 digits', 'warn'); return; }
+  const p = state.players.find(function(x) { return x.id === id; });
+  if (!p) return;
+  p.pin = pin || '';
+  saveState();
+  toast('PIN saved for ' + p.name, 'success');
+}
+
+function removeCompetitor(id) {
+  const p = state.players.find(function(x) { return x.id === id; });
+  if (!p) return;
+  if (!confirm('Remove competitor "' + p.name + '"?\nTheir unlocked picks will be deleted. Locked history is kept.')) return;
+  state.players = state.players.filter(function(x) { return x.id !== id; });
+  Object.keys(state.picks).forEach(function(wk) { delete state.picks[wk][id]; });
+  saveState();
+  renderAll();
+  toast('Removed ' + p.name, 'warn');
+}
+
+function removeLockedWeek() {
+  const sel = document.getElementById('removeWeekSelect');
+  const wk = parseInt(sel.value, 10);
+  if (!wk || !state.lockedWeeks[wk]) { toast('Select a locked week to remove', 'warn'); return; }
+  const lw = state.lockedWeeks[wk];
+  if (!confirm('Remove Week ' + wk + ' (' + lw.tournName + ')? This cannot be undone.')) return;
+  delete state.lockedWeeks[wk];
+  saveState(); renderAll();
+  toast('Week ' + wk + ' removed.', 'warn');
+}
+
+function updateLockWeekLabel() {
+  const sel = document.getElementById('lockWeekSelect');
+  if (!sel) return;
+  const wk = sel.value === 'current' ? state.currentWeek : parseInt(sel.value, 10);
+  ['lockWeekNum','lockWeekNum2'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = wk;
+  });
+}
+
+function updateAdminWeekSelectors() {
+  const lockedWks = Object.keys(state.lockedWeeks).map(Number).sort((a,b) => a-b);
+  const wk = state.currentWeek;
+
+  // Picks week selector
+  const pSel = document.getElementById('picksWeekSelect');
+  if (pSel) {
+    const prev = pSel.value;
+    pSel.innerHTML = '<option value="current">Current (Week ' + wk + ')</option>';
+    for (let i = 1; i < wk; i++) {
+      pSel.innerHTML += '<option value="' + i + '"' + (prev == i ? ' selected' : '') + '>Week ' + i + (state.lockedWeeks[i] ? ' (locked)' : '') + '</option>';
+    }
+  }
+  const pSpan = document.getElementById('picksWeekCurrent');
+  if (pSpan) pSpan.textContent = wk;
+
+  // Scores week selector
+  const sSel = document.getElementById('scoresWeekSelect');
+  if (sSel) {
+    const prev = sSel.value;
+    sSel.innerHTML = '<option value="current">Current (Week ' + wk + ')</option>';
+    for (let i = 1; i < wk; i++) {
+      sSel.innerHTML += '<option value="' + i + '"' + (prev == i ? ' selected' : '') + '>Week ' + i + (state.lockedWeeks[i] ? ' (locked)' : '') + '</option>';
+    }
+  }
+  const sSpan = document.getElementById('scoresWeekCurrent');
+  if (sSpan) sSpan.textContent = wk;
+
+  // Lock week selector — current + any past unlocked weeks
+  const lkSel = document.getElementById('lockWeekSelect');
+  if (lkSel) {
+    const prev = lkSel.value;
+    lkSel.innerHTML = '<option value="current">Current (Week ' + wk + ')</option>';
+    for (let i = 1; i < wk; i++) {
+      if (!state.lockedWeeks[i]) {
+        lkSel.innerHTML += '<option value="' + i + '"' + (prev == i ? ' selected' : '') + '>Week ' + i + ' (unlocked)</option>';
+      }
+    }
+    updateLockWeekLabel();
+  }
+
+  // Remove week selector
+  const rSel = document.getElementById('removeWeekSelect');
+  if (rSel) {
+    rSel.innerHTML = '<option value="">— select week —</option>';
+    lockedWks.forEach(w => {
+      const lw = state.lockedWeeks[w];
+      rSel.innerHTML += '<option value="' + w + '">Week ' + w + ' — ' + escH(lw.tournName) + '</option>';
+    });
+    document.getElementById('removeWeekHint').textContent =
+      lockedWks.length ? lockedWks.length + ' locked week(s) available.' : 'No locked weeks yet.';
+  }
+}
+
+function saveSettings() {
+  state.settings.leagueName = document.getElementById('leagueName').value;
+  state.settings.seasonYear = +document.getElementById('seasonYear').value;
+  state.settings.maxUses    = +document.getElementById('maxUses').value;
+  state.settings.lowPenalty = +document.getElementById('lowPenalty').value;
+  state.settings.highPrize  = +document.getElementById('highPrize').value;
+  const newAdminPin = (document.getElementById('adminPinInput').value || '').trim();
+  if (newAdminPin) {
+    if (!/^\d{4}$/.test(newAdminPin)) { toast('Admin PIN must be exactly 4 digits', 'warn'); return; }
+    state.settings.adminPin = newAdminPin;
+    document.getElementById('adminPinInput').value = '';
+    toast('Admin PIN updated', 'success');
+  }
+  saveState(); renderAll(); toast('Settings saved!', 'success');
+}
+
+function resetSeason() {
+  if (!confirm('Reset ALL season data? This cannot be undone.\n\nThis will clear picks, scores, locked weeks, and money history. Player roster and player list are kept.')) return;
+  state.picks = {}; state.lockedWeeks = {};
+  state.currentWeek = 1; state.currentScores = null; state.currentTournName = '';
+  state.auditLog = []; state.pickDeadline = null; state.picksOpen = false;
+  saveState(); renderAll(); toast('Season reset.', 'warn');
+}
+
+function fullReset() {
+  if (!confirm('FULL RESET — this wipes everything including all players, PINs, the admin PIN, and all season data.\n\nThe app will return to the first-run setup screen.\n\nAre you sure?')) return;
+  if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
+  state = defaultState();
+  saveState();
+  // Sign out and return to first-run setup
+  _session = null;
+  _loggedInPlayerId = null;
+  const adminBtn = document.getElementById('adminTabBtn');
+  if (adminBtn) adminBtn.style.display = 'none';
+  document.getElementById('picksLoginCard').style.display = '';
+  document.getElementById('picksEntryCard').style.display = 'none';
+  document.getElementById('siteGate').style.display = 'none';
+  document.getElementById('setupOverlay').style.display = 'flex';
+  toast('Full reset complete.', 'warn');
+}
+
+function toggleLiveStandings() {
+  const body = document.getElementById('liveStandingsBody');
+  const btn  = document.getElementById('liveToggleBtn');
+  if (!body || !btn) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  btn.textContent = open ? 'Show' : 'Hide';
+}
+
+
+
+// ═══ SESSION ══════════════════════════════════════════════════════════════════
+let _session = null;
+function isAdmin() { return !!(_session && _session.isAdmin); }
+
+// ═══ FIRST-RUN SETUP ══════════════════════════════════════════════════════════
+function saveAdminPinSetup() {
+  const p1 = (document.getElementById('setupPin1').value || '').trim();
+  const p2 = (document.getElementById('setupPin2').value || '').trim();
+  const err = document.getElementById('setupError');
+  err.style.display = 'none';
+  if (!/^\d{4}$/.test(p1)) { err.textContent = 'PIN must be exactly 4 digits.'; err.style.display=''; return; }
+  if (p1 !== p2)            { err.textContent = 'PINs do not match.';            err.style.display=''; return; }
+  state.settings.adminPin = p1;
+  saveState();
+  document.getElementById('setupOverlay').style.display = 'none';
+  showSiteGate();
+}
+
+// ═══ SITE GATE ════════════════════════════════════════════════════════════════
+function showSiteGate() {
+  const sel = document.getElementById('gateNameSelect');
+  sel.innerHTML = '<option value="">— select your name —</option><option value="__admin__">Admin</option>';
+  [...state.players].sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  const lbl = document.getElementById('gateLeagueName');
+  if (lbl) lbl.textContent = state.settings.leagueName || 'GolfHunks';
+  document.getElementById('siteGate').style.display = 'flex';
+  document.getElementById('gatePinInput').value = '';
+  document.getElementById('gateError').style.display = 'none';
+  setTimeout(function() { document.getElementById('gatePinInput').focus(); }, 100);
+}
+
+function siteLogin() {
+  const selId = (document.getElementById('gateNameSelect').value || '').trim();
+  const pin   = (document.getElementById('gatePinInput').value  || '').trim();
+  const err   = document.getElementById('gateError');
+  err.style.display = 'none';
+  if (!selId) { err.textContent = 'Please select your name.'; err.style.display=''; return; }
+  if (!pin)   { err.textContent = 'Please enter your PIN.';   err.style.display=''; return; }
+
+  if (selId === '__admin__') {
+    if (pin !== state.settings.adminPin) { err.textContent = 'Incorrect PIN.'; err.style.display=''; return; }
+    _session = { id: '__admin__', name: 'Admin', isAdmin: true };
+    _loggedInPlayerId = null;
+    enterApp();
+    return;
+  }
+  const player = state.players.find(function(p) { return p.id === selId; });
+  if (!player)      { err.textContent = 'Competitor not found.';          err.style.display=''; return; }
+  if (!player.pin)  { err.textContent = 'No PIN set — contact the admin.'; err.style.display=''; return; }
+  if (pin !== player.pin) { err.textContent = 'Incorrect PIN.';           err.style.display=''; return; }
+
+  _session = { id: player.id, name: player.name, isAdmin: false };
+  _loggedInPlayerId = player.id;
+  enterApp();
+}
+
+function enterApp() {
+  document.getElementById('siteGate').style.display = 'none';
+  const adminBtn = document.getElementById('adminTabBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin() ? '' : 'none';
+  const lbl = document.getElementById('headerUserLabel');
+  if (lbl) lbl.textContent = _session.name + (_session.isAdmin ? ' (admin)' : '');
+  if (_loggedInPlayerId) {
+    document.getElementById('picksLoginCard').style.display = 'none';
+    document.getElementById('picksEntryCard').style.display = '';
+  }
+  showTab('standings'); // show tab first so standings renders into a visible element
+  renderAll();
+}
+
+function siteLogout() {
+  _session = null;
+  _loggedInPlayerId = null;
+  const adminBtn = document.getElementById('adminTabBtn');
+  if (adminBtn) adminBtn.style.display = 'none';
+  document.getElementById('picksLoginCard').style.display = '';
+  document.getElementById('picksEntryCard').style.display = 'none';
+  showSiteGate();
+}
+
+// ═══ TIMEZONE HELPERS (Central Time) ══════════════════════════════════════════
+const CT_OFFSET_STD = -6; // CST
+const CT_OFFSET_DST = -5; // CDT
+
+function isCDT(date) {
+  // DST: second Sunday March → first Sunday November
+  const yr = date.getUTCFullYear();
+  const start = new Date(Date.UTC(yr, 2, 8 - new Date(Date.UTC(yr,2,1)).getUTCDay()));
+  const end   = new Date(Date.UTC(yr,10, 1 - new Date(Date.UTC(yr,10,1)).getUTCDay()));
+  return date >= start && date < end;
+}
+
+function utcToCT(date) {
+  // Returns a Date shifted by CT offset — use getUTC* methods on the result
+  const off = isCDT(date) ? CT_OFFSET_DST : CT_OFFSET_STD;
+  return new Date(date.getTime() + off * 3600000);
+}
+
+function ctLocalToUTC(localIso) {
+  // localIso is "YYYY-MM-DDTHH:MM" from datetime-local — no timezone info.
+  // Parse the components manually and treat them as CT, then convert to UTC.
+  const [datePart, timePart] = localIso.split('T');
+  const [yr, mo, dy] = datePart.split('-').map(Number);
+  const [hr, mn] = (timePart || '00:00').split(':').map(Number);
+  // Create a UTC date representing these numbers as if they were CT
+  // First build as UTC to get a rough date for DST detection
+  const rough = new Date(Date.UTC(yr, mo - 1, dy, hr, mn, 0));
+  // Determine CT offset at this rough time
+  const ctOff = isCDT(rough) ? CT_OFFSET_DST : CT_OFFSET_STD;
+  // Actual UTC = CT time - CT offset (CT is behind UTC so subtract negative = add)
+  return new Date(Date.UTC(yr, mo - 1, dy, hr - ctOff, mn, 0));
+}
+
+function fmtCT(utcDate) {
+  // Always use Intl with America/Chicago — never manually shift the date
+  const opts = { timeZone: 'America/Chicago' };
+  return utcDate.toLocaleDateString('en-US', { ...opts, weekday:'short', month:'short', day:'numeric' }) +
+    ' ' + utcDate.toLocaleTimeString('en-US', { ...opts, hour:'numeric', minute:'2-digit', timeZoneName:'short' });
+}
+
+function checkDeadlineAutoLock() {
+  if (!state.picksOpen) return; // already closed
+  const dl = deadlineUtc();
+  if (!dl) return; // no deadline set
+  if (Date.now() >= dl.getTime()) {
+    // Deadline has passed — auto-close self-entry
+    state.picksOpen = false;
+    saveState();
+    renderDeadlineStatus();
+    // Re-render standings since picks are now visible
+    renderWeeklyFantasyScores();
+    renderLiveStandings();
+    toast('Pick deadline passed — self-entry closed automatically', 'warn');
+  }
+}
+
+function deadlineUtc() {
+  if (!state.pickDeadline) return null;
+  return new Date(state.pickDeadline);
+}
+
+function picksAreLocked() {
+  if (!state.picksOpen) return true;
+  const dl = deadlineUtc();
+  if (!dl) return false;
+  return Date.now() > dl.getTime();
+}
+
+// ═══ DEADLINE ADMIN ════════════════════════════════════════════════════════════
+function saveDeadlineSettings() {
+  const inp = document.getElementById('pickDeadlineInput');
+  const toggle = document.getElementById('picksOpenToggle');
+  if (!inp || !toggle) return;
+  const val = inp.value; // "YYYY-MM-DDTHH:MM" in CT
+  state.pickDeadline = val ? ctLocalToUTC(val).toISOString() : null;
+  state.picksOpen = toggle.checked;
+  saveState();
+  renderDeadlineStatus();
+  toast('Deadline settings saved', 'success');
+}
+
+function renderDeadlineStatus() {
+  const inp = document.getElementById('pickDeadlineInput');
+  const toggle = document.getElementById('picksOpenToggle');
+  const statusEl = document.getElementById('deadlineStatus');
+  if (!inp || !toggle || !statusEl) return;
+
+  // Populate input from state — skip if user is actively editing the field
+  if (document.activeElement !== inp) {
+    if (state.pickDeadline) {
+      const utc = new Date(state.pickDeadline);
+      const ct  = utcToCT(utc);
+      const pad = function(n) { return String(n).padStart(2,'0'); };
+      // Use UTC getters on the shifted date — avoids browser local timezone interference
+      inp.value = ct.getUTCFullYear() + '-' + pad(ct.getUTCMonth()+1) + '-' + pad(ct.getUTCDate()) +
+        'T' + pad(ct.getUTCHours()) + ':' + pad(ct.getUTCMinutes());
+    } else {
+      inp.value = '';
+    }
+  }
+  toggle.checked = !!state.picksOpen;
+
+  const dl = deadlineUtc();
+  if (!state.picksOpen) {
+    statusEl.textContent = 'Self-entry is OFF';
+  } else if (!dl) {
+    statusEl.textContent = 'Open — no deadline set';
+  } else if (Date.now() > dl.getTime()) {
+    statusEl.textContent = 'LOCKED — deadline passed ' + fmtCT(dl);
+  } else {
+    const mins = Math.round((dl.getTime() - Date.now()) / 60000);
+    const hrs  = Math.floor(mins / 60);
+    const rem  = hrs > 0 ? hrs + 'h ' + (mins%60) + 'm remaining' : mins + 'm remaining';
+    statusEl.textContent = 'Open until ' + fmtCT(dl) + ' (' + rem + ')';
+  }
+}
+
+// ═══ SUBMISSION STATUS (admin view) ════════════════════════════════════════════
+function renderSubmissionStatus() {
+  const el = document.getElementById('submissionStatus');
+  if (!el) return;
+  if (!state.players.length) { el.innerHTML = '<div class="empty">No competitors yet.</div>'; return; }
+
+  const wk = state.currentWeek;
+  const wkPicks = state.picks[wk] || {};
+  let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
+    '<th>Competitor</th><th>Status</th><th>Picks</th><th class="r">Last Changed</th></tr></thead><tbody>';
+
+  state.players.forEach(function(p) {
+    const myPicks = wkPicks[p.id] || [];
+    const hasPin = !!(p.pin && p.pin.length === 4);
+    // Find most recent audit entry for this player this week
+    const lastEntry = [...(state.auditLog||[])].reverse().find(function(e) {
+      return e.playerId === p.id && e.week === wk;
+    });
+    const submitted = myPicks.length > 0;
+    const statusColor = submitted ? '#5dcc7a' : '#e07070';
+    const statusText = submitted ? '✓ Submitted' : '✗ No picks';
+    const pickStr = myPicks.map(function(g) { return fmtName(g); }).join(', ') || '—';
+    const lastTs = lastEntry ? new Date(lastEntry.ts).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) + ' CT' : '—';
+
+    h += '<tr>' +
+      '<td style="font-family:var(--mono);font-size:.8rem;">' + escH(p.name) +
+        (hasPin ? '' : ' <span class="tag tag-gold" style="font-size:.55rem;">NO PIN</span>') + '</td>' +
+      '<td style="color:' + statusColor + ';font-family:var(--mono);font-size:.78rem;">' + statusText + '</td>' +
+      '<td class="text-small text-muted">' + escH(pickStr) + '</td>' +
+      '<td class="r text-small text-muted" style="font-family:var(--mono)">' + lastTs + '</td>' +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+}
+
+// ═══ AUDIT LOG ══════════════════════════════════════════════════════════════════
+function logPickChange(playerId, playerName, week, prevPicks, newPicks) {
+  if (!state.auditLog) state.auditLog = [];
+  state.auditLog.push({
+    ts: new Date().toISOString(),
+    playerId: playerId,
+    competitorName: playerName,
+    week: week,
+    prev: prevPicks || [],
+    next: newPicks,
+  });
+  // Keep last 500 entries
+  if (state.auditLog.length > 500) state.auditLog = state.auditLog.slice(-500);
+}
+
+function renderAuditLog() {
+  const el = document.getElementById('auditLogTable');
+  if (!el) return;
+  const log = (state.auditLog || []).slice().reverse();
+  if (!log.length) { el.innerHTML = '<div class="empty">No changes logged yet.</div>'; return; }
+
+  let h = '<div style="overflow-x:auto;max-height:340px;overflow-y:auto">' +
+    '<table class="data-table"><thead><tr>' +
+    '<th>Time (CT)</th><th>Competitor</th><th>Wk</th><th>Previous Picks</th><th>New Picks</th>' +
+    '</tr></thead><tbody>';
+
+  log.forEach(function(e) {
+    const ts = new Date(e.ts).toLocaleString('en-US',{
+      timeZone:'America/Chicago', month:'short', day:'numeric',
+      hour:'numeric', minute:'2-digit'}) + ' CT';
+    const prev = (e.prev||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
+    const next = (e.next||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
+    const changed = JSON.stringify(e.prev||[]) !== JSON.stringify(e.next||[]);
+    h += '<tr' + (changed ? '' : ' style="opacity:.5"') + '>' +
+      '<td class="text-small" style="font-family:var(--mono);white-space:nowrap;">' + ts + '</td>' +
+      '<td class="text-small">' + escH(e.competitorName||'') + '</td>' +
+      '<td class="text-small r">' + e.week + '</td>' +
+      '<td class="text-small text-muted">' + escH(prev) + '</td>' +
+      '<td class="text-small">' + escH(next) + '</td>' +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+}
+
+// ═══ COMPETITOR LOGIN / LOGOUT ══════════════════════════════════════════════════
+let _loggedInPlayerId = null;
+
+function competitorLogin() {
+  const nameEl = document.getElementById('picksLoginName');
+  const pinEl  = document.getElementById('picksLoginPin');
+  const errEl  = document.getElementById('picksLoginError');
+  const selId  = nameEl ? nameEl.value : '';
+  const pin    = pinEl  ? pinEl.value.trim() : '';
+
+  errEl.style.display = 'none';
+
+  if (!selId) { errEl.textContent = 'Please select your name.'; errEl.style.display=''; return; }
+  const player = state.players.find(function(p) { return p.id === selId; });
+  if (!player) { errEl.textContent = 'Competitor not found.'; errEl.style.display=''; return; }
+  if (!player.pin) { errEl.textContent = 'No PIN set for your account — contact the admin.'; errEl.style.display=''; return; }
+  if (pin !== player.pin) { errEl.textContent = 'Incorrect PIN.'; errEl.style.display=''; return; }
+
+  _loggedInPlayerId = selId;
+  document.getElementById('picksLoginCard').style.display = 'none';
+  document.getElementById('picksEntryCard').style.display = '';
+  renderPicksEntry();
+}
+
+function competitorLogout() {
+  _loggedInPlayerId = null;
+  document.getElementById('picksLoginCard').style.display = '';
+  document.getElementById('picksEntryCard').style.display = 'none';
+  if (document.getElementById('picksLoginPin')) document.getElementById('picksLoginPin').value = '';
+}
+
+// ═══ PICK ENTRY UI (competitor self-service) ════════════════════════════════════
+function renderPicksLoginDropdown() {
+  const sel = document.getElementById('picksLoginName');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select —</option>';
+  [...state.players].sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(p) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+}
+
+function renderPicksEntry() {
+  const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (!player) { competitorLogout(); return; }
+
+  document.getElementById('picksEntryTitle').textContent = 'Enter 5 golfers — max ' + state.settings.maxUses + ' uses per golfer this season';
+
+  // Deadline banner
+  const banner = document.getElementById('picksDeadlineBanner');
+  const locked = picksAreLocked();
+  const dl = deadlineUtc();
+  if (!state.picksOpen) {
+    banner.style.borderLeftColor = '#e07070';
+    banner.innerHTML = '🔒 Pick submission is currently closed. Contact the admin.';
+  } else if (locked) {
+    banner.style.borderLeftColor = '#e07070';
+    banner.innerHTML = '🔒 Pick deadline has passed — ' + (dl ? fmtCT(dl) : '') + '. Your picks are locked.';
+  } else if (dl) {
+    const mins = Math.round((dl.getTime() - Date.now()) / 60000);
+    const hrs  = Math.floor(mins/60);
+    const rem  = hrs > 0 ? hrs + 'h ' + (mins%60) + 'm' : mins + 'm';
+    banner.style.borderLeftColor = 'var(--gold)';
+    banner.innerHTML = '⏰ Deadline: ' + fmtCT(dl) + ' — <strong>' + rem + ' remaining</strong>';
+  } else {
+    banner.style.borderLeftColor = 'var(--green-light)';
+    banner.innerHTML = '✓ Picks are open. Submit before the deadline.';
+  }
+
+  const wk = state.currentWeek;
+  const existing = (state.picks[wk] || {})[player.id] || [];
+  const body = document.getElementById('picksEntryBody');
+
+  if (locked) {
+    // Read-only view of their picks
+    let h = '<p class="text-small text-muted" style="margin-bottom:10px;">Your submitted picks for Week ' + wk + ':</p>';
+    if (existing.length) {
+      h += '<ol style="font-family:var(--mono);font-size:.82rem;line-height:2;">';
+      existing.forEach(function(g) { h += '<li>' + escH(fmtName(g)) + '</li>'; });
+      h += '</ol>';
+    } else {
+      h += '<div class="empty"><div class="empty-icon">🏌️</div>No picks submitted for this week.</div>';
+    }
+    body.innerHTML = h;
+    return;
+  }
+
+  // Check max uses per golfer (show usage counts)
+  const golferUsageByPlayer = {};
+  state.players.forEach(function(p2) {
+    golferUsageByPlayer[p2.id] = {};
+    Object.keys(state.lockedWeeks).forEach(function(lwk) {
+      const lw = state.lockedWeeks[lwk];
+      lw.results.forEach(function(r) {
+        if (r.playerId !== p2.id) return;
+        r.picks.forEach(function(g) {
+          var k = g.toLowerCase().trim();
+          golferUsageByPlayer[p2.id][k] = (golferUsageByPlayer[p2.id][k]||0)+1;
+        });
+      });
+    });
+  });
+  const myUsage = golferUsageByPlayer[player.id] || {};
+
+  // Build golfer options from playerList
+  const golferOptions = state.playerList.length
+    ? state.playerList.map(function(p) { return p.player_name; }).sort()
+    : [];
+
+  const dlId = 'golferDL';
+  let h = '<datalist id="' + dlId + '">';
+  golferOptions.forEach(function(n) {
+    var k = n.toLowerCase().trim();
+    var uses = myUsage[k] || 0;
+    if (uses < state.settings.maxUses) h += '<option value="' + escH(n) + '">';
+  });
+  h += '</datalist>';
+
+
+  for (var i = 0; i < 5; i++) {
+    const val = existing[i] || '';
+    // Compute initial usage badge for pre-filled value
+    const initKey = val.toLowerCase().trim();
+    const initUses = initKey ? (myUsage[initKey] || 0) : null;
+    const badgeHtml = initUses !== null ? buildUsageBadge(initUses, state.settings.maxUses) : '';
+    h += '<div class="form-row" style="margin-bottom:8px;">' +
+      '<label>Golfer ' + (i+1) + '</label>' +
+      '<div style="display:flex;gap:8px;align-items:center;">' +
+        '<input type="text" class="pick-golfer-input" id="pickGolfer_' + i + '" ' +
+          'value="' + escH(val) + '" list="' + dlId + '" placeholder="Last, First" ' +
+          'style="flex:1;" />' +
+        '<span id="usageBadge_' + i + '" style="min-width:54px;text-align:right;font-family:var(--mono);font-size:.7rem;white-space:nowrap;">' + badgeHtml + '</span>' +
+      '</div>' +
+      '</div>';
+  }
+
+  // Usage warning
+  h += '<div id="picksUsageWarning" style="display:none;margin-top:8px;"></div>';
+
+  h += '<div class="flex mt-16" style="gap:8px;">' +
+    '<button class="btn" onclick="submitCompetitorPicks()">Submit Picks</button>' +
+    '<button class="btn-ghost" onclick="renderPicksEntry()">Reset</button>' +
+    '</div>';
+  h += '<div id="picksSubmitMsg" style="margin-top:10px;font-family:var(--mono);font-size:.74rem;"></div>';
+
+  body.innerHTML = h;
+
+  // Wire up usage checking on input AND change (datalist mobile fires change)
+  document.querySelectorAll('.pick-golfer-input').forEach(function(inp) {
+    inp.addEventListener('input', checkPickUsage);
+    inp.addEventListener('change', checkPickUsage);
+  });
+}
+
+function buildUsageBadge(uses, max) {
+  // Plain x/max — muted when unused, gold when at max
+  if (!uses) return '<span style="color:var(--text-muted);opacity:.5">0/' + max + '</span>';
+  if (uses >= max) return '<span style="color:var(--gold);font-weight:700">' + uses + '/' + max + '</span>';
+  return '<span style="color:var(--text-muted)">' + uses + '/' + max + '</span>';
+}
+
+function checkPickUsage() {
+  const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (!player) return;
+  const golferUsageByPlayer = {};
+  golferUsageByPlayer[player.id] = {};
+  Object.keys(state.lockedWeeks).forEach(function(lwk) {
+    const lw = state.lockedWeeks[lwk];
+    lw.results.forEach(function(r) {
+      if (r.playerId !== player.id) return;
+      r.picks.forEach(function(g) {
+        var k = g.toLowerCase().trim();
+        golferUsageByPlayer[player.id][normName(g)] = (golferUsageByPlayer[player.id][normName(g)]||0)+1;
+      });
+    });
+  });
+  // Rebuild myUsage with normalised keys
+  const myUsageNorm = {};
+  Object.keys(golferUsageByPlayer[player.id] || {}).forEach(function(k) {
+    myUsageNorm[normName(k)] = golferUsageByPlayer[player.id][k];
+  });
+  const inputs = document.querySelectorAll('.pick-golfer-input');
+  const entered = [];
+  inputs.forEach(function(inp) { if (inp.value.trim()) entered.push(normName(inp.value)); });
+
+  const warnings = [];
+  const seen = {};
+  entered.forEach(function(g) {
+    if (!g) return;
+    seen[g] = (seen[g]||0)+1;
+    if (seen[g] > 1) { warnings.push('"' + g + '" entered more than once this week'); return; }
+    const pastUses = myUsageNorm[g] || 0;
+    if (pastUses >= state.settings.maxUses) warnings.push(fmtName(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
+    else if (pastUses === state.settings.maxUses - 1) warnings.push(fmtName(g) + ' — this would be your last allowed use');
+  });
+
+  // Refresh per-input usage badges
+  // Count = locked-week history + OTHER current inputs that have the same golfer
+  const player2 = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (player2) {
+    // Base usage from locked weeks — normalise all names to "last, first"
+    const lockedUsage = {};
+    Object.keys(state.lockedWeeks).forEach(function(lwk) {
+      const lw = state.lockedWeeks[lwk];
+      lw.results.forEach(function(r) {
+        if (r.playerId !== player2.id) return;
+        r.picks.forEach(function(g) {
+          var k = normName(g);
+          lockedUsage[k] = (lockedUsage[k]||0)+1;
+        });
+      });
+    });
+
+    const allInputs = document.querySelectorAll('.pick-golfer-input');
+
+    allInputs.forEach(function(inp, idx) {
+      const badgeEl = document.getElementById('usageBadge_' + idx);
+      if (!badgeEl) return;
+      const k = normName(inp.value);
+      if (!k) { badgeEl.innerHTML = ''; return; }
+
+      // Count ALL inputs (including this one) that have this golfer this week
+      var thisWeekCount = 0;
+      allInputs.forEach(function(other) {
+        if (normName(other.value) === k) thisWeekCount++;
+      });
+
+      const uses = (lockedUsage[k] || 0) + thisWeekCount;
+      badgeEl.innerHTML = buildUsageBadge(uses, state.settings.maxUses);
+    });
+  }
+
+  const warnEl = document.getElementById('picksUsageWarning');
+  if (warnEl) {
+    if (warnings.length) {
+      warnEl.innerHTML = '<div class="alert alert-warn" style="padding:8px 12px;font-size:.74rem;">' +
+        warnings.map(function(w){ return '⚠ ' + escH(w); }).join('<br>') + '</div>';
+      warnEl.style.display = '';
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+}
+
+function submitCompetitorPicks() {
+  if (picksAreLocked()) { toast('Pick deadline has passed', 'error'); return; }
+  const player = state.players.find(function(p) { return p.id === _loggedInPlayerId; });
+  if (!player) return;
+
+  const inputs = document.querySelectorAll('.pick-golfer-input');
+  const newPicks = [];
+  inputs.forEach(function(inp) { if (inp.value.trim()) newPicks.push(inp.value.trim()); });
+
+  if (newPicks.length !== 5) { toast('Please enter exactly 5 golfers', 'warn'); return; }
+
+  // Duplicate check
+  const lower = newPicks.map(function(g){ return g.toLowerCase(); });
+  const unique = new Set(lower);
+  if (unique.size !== lower.length) { toast('You have duplicate golfers', 'warn'); return; }
+
+  const wk = state.currentWeek;
+  const prev = ((state.picks[wk]||{})[player.id] || []).slice();
+
+  if (!state.picks[wk]) state.picks[wk] = {};
+  state.picks[wk][player.id] = newPicks;
+
+  logPickChange(player.id, player.name, wk, prev, newPicks);
+  saveState();
+
+  const msgEl = document.getElementById('picksSubmitMsg');
+  const ts = new Date().toLocaleString('en-US',{timeZone:'America/Chicago',
+    weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  if (msgEl) msgEl.innerHTML = '<span style="color:#5dcc7a;">✓ Picks saved at ' + ts + ' CT</span>';
+  toast('Picks submitted!', 'success');
+}
+
+// ═══ NAVIGATION ═══════════════════════════════════════════════════════════════
+function showTab(tab) {
+  TABS.forEach(t => { document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none'; });
+  document.querySelectorAll('.nav-tab').forEach((el, i) => { el.classList.toggle('active', TABS[i] === tab); });
+  if (tab === 'field')    renderFieldTable();
+  if (tab === 'history')  renderWeekHistory();
+  if (tab === 'standings') { renderLiveStandings(); renderCumulativeStandings(); }
+  if (tab === 'mypicks')  {
+    renderPicksLoginDropdown();
+    if (_loggedInPlayerId) {
+      document.getElementById('picksLoginCard').style.display = 'none';
+      document.getElementById('picksEntryCard').style.display = '';
+      renderPicksEntry();
+    } else {
+      document.getElementById('picksLoginCard').style.display = '';
+      document.getElementById('picksEntryCard').style.display = 'none';
+    }
+  }
+  if (tab === 'admin')    { renderWinnerDebug(); renderSubmissionStatus(); renderAuditLog(); renderDeadlineStatus(); renderStateDebug(); }
+}
+
+function renderAll() {
+  const s = state.settings;
+  document.getElementById('statPlayers').textContent  = state.players.length;
+  document.getElementById('statWeek').textContent     = 'Wk ' + state.currentWeek;
+
+
+
+  // Settings fields
+  document.getElementById('leagueName').value  = s.leagueName;
+  document.getElementById('seasonYear').value  = s.seasonYear;
+  document.getElementById('maxUses').value     = s.maxUses;
+  document.getElementById('lowPenalty').value  = s.lowPenalty;
+  document.getElementById('highPrize').value   = s.highPrize;
+  const apEl = document.getElementById('adminPinInput');
+  if (apEl) apEl.placeholder = s.adminPin ? '••••  (set — enter new to change)' : '4 digits';
+  ['lockWeekNum2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = state.currentWeek; });
+  updateLockWeekLabel();
+
+  // Always show GolfHunks branding regardless of stored leagueName
+  document.querySelector('header h1').innerHTML = '⛳ GolfHunks';
+  document.title = 'GolfHunks';
+
+  checkDeadlineAutoLock();
+  updateBanner();
+  updateAdminWeekSelectors();
+  renderCompetitorList();
+  renderPicksLoginDropdown();
+  renderDeadlineStatus();
+  renderSubmissionStatus();
+  renderAuditLog();
+  renderLeaderboardTable();
+  renderWeeklyFantasyScores();
+  renderAdminWeekScores();
+  renderLiveStandings();
+  renderCumulativeStandings();
+
+  if (state.playerList.length) {
+    document.getElementById('fieldUploadHint').style.display = 'none';
+    document.getElementById('playerListDropZone').classList.add('file-loaded');
+    document.getElementById('playerListDropLabel').textContent = '✓ ' + state.playerList.length + ' players loaded (re-upload to update)';
+  }
+}
+
+// ═══ TOAST ════════════════════════════════════════════════════════════════════
+let _tt;
+function toast(msg, type = 'info') {
+  const el = document.getElementById('alert-toast');
+  const bg = {info:'rgba(78,130,200,.95)',success:'rgba(45,110,58,.95)',warn:'rgba(180,140,30,.95)',error:'rgba(176,58,46,.95)'}[type]||'rgba(78,130,200,.95)';
+  const bc = {info:'#4e82c8',success:'#3a8a4a',warn:'#c9a84c',error:'#b03a2e'}[type]||'#4e82c8';
+  el.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999;font-family:var(--mono);font-size:.76rem;padding:10px 15px;border-radius:6px;max-width:330px;background:'+bg+';border:1px solid '+bc+';color:#fff;display:block;';
+  el.textContent = msg;
+  clearTimeout(_tt); _tt = setTimeout(() => { el.style.display = 'none'; }, 3400);
+}
+
+// ═══ DATAGOLF API ═════════════════════════════════════════════════════════════════════════════
+
+// Cloud Function base URL — update this after first deploy
+// e.g. 'https://us-central1-golfhunks.cloudfunctions.net'
+const DG_FUNCTIONS_BASE = 'https://us-central1-golfhunks.cloudfunctions.net';
+
+// Fetch the shared secret from Firestore (stored at gfl-dev/secret)
+// Called once after login; cached in memory for the session
+let _dgSecret = null;
+async function getDgSecret() {
+  if (_dgSecret) return _dgSecret;
+  try {
+    const { getDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const snap = await getDoc(doc(window._db, 'gfl-dev', 'secret'));
+    if (snap.exists()) { _dgSecret = snap.data().value; return _dgSecret; }
+  } catch(e) { console.error('getDgSecret error:', e); }
+  return null;
+}
+
+async function dgCall(endpoint, body) {
+  const secret = await getDgSecret();
+  if (!secret) { toast('App secret not configured — see setup instructions', 'error'); return null; }
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold);">⏳ Fetching from DataGolf…</span>';
+  try {
+    const resp = await fetch(DG_FUNCTIONS_BASE + '/' + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-app-secret': secret },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.statusText);
+    return data;
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:#e07070;">❌ Error: ' + escH(e.message) + '</span>';
+    toast('DataGolf fetch failed: ' + e.message, 'error');
+    return null;
+  }
+}
+
+async function dgFetchField() {
+  const result = await dgCall('fetchField', { tour: 'pga' });
+  if (!result) return;
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:#5dcc7a;">✓ Field loaded — ' + result.players + ' players' + (result.tournName ? ' · ' + escH(result.tournName) : '') + '</span>';
+  toast('Field loaded from DataGolf — ' + result.players + ' players', 'success');
+}
+
+async function dgFetchScores() {
+  const tournName = (document.getElementById('dgTournName')?.value || '').trim();
+  const isMajor   = document.getElementById('dgIsMajor')?.checked || false;
+  const result = await dgCall('fetchScores', { tournName, isMajor, tour: 'pga' });
+  if (!result) return;
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:#5dcc7a;">✓ Scores loaded — ' + result.players + ' players · Round: ' + escH(result.round || 'unknown') + '</span>';
+  toast('Scores loaded from DataGolf — ' + result.players + ' players', 'success');
+}
+
+async function dgFetchRankings() {
+  const result = await dgCall('fetchRankings', {});
+  if (!result) return;
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:#5dcc7a;">✓ Rankings refreshed — ' + result.players + ' players</span>';
+  toast('Rankings refreshed from DataGolf — ' + result.players + ' players', 'success');
+}
+
+// ═══ INIT ═════════════════════════════════════════════════════════════════════
+setInterval(function() { if (_session) checkDeadlineAutoLock(); }, 60000);
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Wait for Firebase module to signal ready, then init Firestore
+  if (window._firebaseReady) {
+    initFirestore();
+  } else {
+    document.addEventListener('firebaseReady', function() { initFirestore(); });
+    // Safety timeout — if Firebase never fires, show error
+    setTimeout(function() {
+      if (!window._firebaseReady) {
+        document.getElementById('loadingError').textContent =
+          'Firebase did not load. Check your internet connection.';
+        document.getElementById('loadingError').style.display = '';
+      }
+    }, 8000);
+  }
+});
+</script>
+</body>
+</html>
