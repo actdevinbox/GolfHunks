@@ -242,6 +242,7 @@
   window._fsSetDoc = setDoc;
   window._fsGetDoc = getDoc;
   window._fsOnSnapshot = onSnapshot;
+  window._fsDoc = doc;
   window._firebaseReady = true;
   document.dispatchEvent(new Event('firebaseReady'));
 </script>
@@ -464,6 +465,30 @@
 
   <!-- ══ ADMIN TAB ══ -->
   <div id="tab-admin" style="display:none;">
+
+    <!-- DataGolf Live API -->
+    <div class="card" style="border-color:var(--gold);">
+      <div class="card-title">&#x26A1; DataGolf Live <span class="tag tag-gold" style="margin-left:8px;">API</span></div>
+      <p class="text-small text-muted" style="margin-bottom:14px;">
+        Fetch live data directly from DataGolf. Scores auto-refresh every 5 min when a tournament is active.
+        Use <strong>Fetch Field</strong> at the start of each week, then <strong>Fetch Scores</strong> to go live.
+        Rankings only need refreshing once per week.
+      </p>
+      <div class="form-row">
+        <label>Tournament Name (optional override)</label>
+        <input type="text" id="dgTournName" placeholder="e.g. The Masters 2026 &mdash; leave blank to use DataGolf name" />
+      </div>
+      <div class="form-row" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="dgIsMajor" style="width:auto;" />
+        <label style="margin-bottom:0;color:var(--gold);">&#x2B50; This is a Major (all scores doubled)</label>
+      </div>
+      <div class="flex mt-16" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn" onclick="dgFetchField()">&#x1F4CB; Fetch Field</button>
+        <button class="btn" onclick="dgFetchScores()">&#x1F3CC; Fetch Scores</button>
+        <button class="btn-ghost" onclick="dgFetchRankings()">&#x1F4CA; Refresh Rankings</button>
+      </div>
+      <div id="dgStatus" style="margin-top:12px;font-family:var(--mono);font-size:.74rem;"></div>
+    </div>
 
     <!-- Picks CSV upload (fix #5) -->
     <div class="card">
@@ -1548,20 +1573,54 @@ function calcWeekResults(wk) {
 
   if (!results.length) return null;
 
-  // Determine best/worst with tie splitting
+  // ── Tiebreaker logic ──────────────────────────────────────────────────────
+  // In golf: LOWER score = BETTER.
+  // Best (lowest total) owes penalty. Worst (highest total) wins prize.
+  // Tiebreaker for best: compare sorted individual golfer scores low→high.
+  // Tiebreaker for worst: compare sorted individual golfer scores high→low.
+  // If completely identical picks/scores: split evenly.
+
+  function getSortedScores(result, ascending) {
+    // Returns competitor's individual golfer scores sorted asc (for best TB) or desc (for worst TB)
+    const scores = result.pickDetail.map(pd => pd.score !== null && pd.score !== undefined ? pd.score : 9999);
+    return ascending ? [...scores].sort((a,b) => a - b) : [...scores].sort((a,b) => b - a);
+  }
+
+  function breakTie(tied, ascending) {
+    // Returns array of winners (length 1 if resolved, >1 if truly identical)
+    if (tied.length === 1) return tied;
+    const maxLen = Math.max(...tied.map(r => r.pickDetail.length));
+    for (let i = 0; i < maxLen; i++) {
+      const sortedScores = tied.map(r => getSortedScores(r, ascending));
+      const vals = sortedScores.map(s => s[i] !== undefined ? s[i] : 9999);
+      const best = ascending ? Math.min(...vals) : Math.max(...vals);
+      const survivors = tied.filter((r, idx) => vals[idx] === best);
+      if (survivors.length < tied.length) return breakTie(survivors, ascending);
+    }
+    return tied; // truly identical
+  }
+
   const withScores = results.filter(r => r.total !== null);
   if (withScores.length > 1) {
     const scores = withScores.map(r => r.total);
     const bestScore  = Math.min(...scores);
     const worstScore = Math.max(...scores);
-    const bestCount  = scores.filter(s => s === bestScore).length;
-    const worstCount = scores.filter(s => s === worstScore).length;
-    // Split prize/penalty evenly across tied players, rounded to 2dp
-    const splitPrize   = Math.round((state.settings.highPrize  / bestCount)  * 100) / 100;
-    const splitPenalty = Math.round((state.settings.lowPenalty / worstCount) * 100) / 100;
+
+    const bestTied  = withScores.filter(r => r.total === bestScore);
+    const worstTied = withScores.filter(r => r.total === worstScore);
+
+    const bestWinners  = breakTie(bestTied,  true);   // ascending = lowest individual score wins
+    const worstWinners = breakTie(worstTied, false);  // descending = highest individual score loses
+
+    const splitPrize   = Math.round((state.settings.highPrize  / bestWinners.length)  * 100) / 100;
+    const splitPenalty = Math.round((state.settings.lowPenalty / worstWinners.length) * 100) / 100;
+
+    const bestIds  = new Set(bestWinners.map(r => r.player.id));
+    const worstIds = new Set(worstWinners.map(r => r.player.id));
+
     results.forEach(r => {
-      r.isBest  = r.total === bestScore;
-      r.isWorst = r.total === worstScore;
+      r.isBest  = bestIds.has(r.player.id);
+      r.isWorst = worstIds.has(r.player.id);
       r.splitPrize   = r.isBest  ? splitPrize   : 0;
       r.splitPenalty = r.isWorst ? splitPenalty : 0;
     });
@@ -2845,6 +2904,14 @@ function checkDeadlineAutoLock() {
     renderWeeklyFantasyScores();
     renderLiveStandings();
     toast('Pick deadline passed — self-entry closed automatically', 'warn');
+    // Auto-fetch live data from DataGolf after picks lock
+    // The scheduled function fires every 5 min, but we trigger immediately here too
+    if (typeof dgCall === 'function') {
+      toast('Fetching live scores from DataGolf…', 'info');
+      dgFetchField().then(function() { return dgFetchScores(); }).catch(function(e) {
+        console.warn('Auto-fetch after lock failed:', e);
+      });
+    }
   }
 }
 
@@ -2975,8 +3042,8 @@ function renderAuditLog() {
     const ts = new Date(e.ts).toLocaleString('en-US',{
       timeZone:'America/Chicago', month:'short', day:'numeric',
       hour:'numeric', minute:'2-digit'}) + ' CT';
-    const prev = (e.prev||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
-    const next = (e.next||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
+    const prev = (e.prev||[]).map(function(g){return escH(g);}).join(', ') || '(none)';
+    const next = (e.next||[]).map(function(g){return escH(g);}).join(', ') || '(none)';
     const changed = JSON.stringify(e.prev||[]) !== JSON.stringify(e.next||[]);
     h += '<tr' + (changed ? '' : ' style="opacity:.5"') + '>' +
       '<td class="text-small" style="font-family:var(--mono);white-space:nowrap;">' + ts + '</td>' +
@@ -3069,7 +3136,7 @@ function renderPicksEntry() {
     let h = '<p class="text-small text-muted" style="margin-bottom:10px;">Your submitted picks for Week ' + wk + ':</p>';
     if (existing.length) {
       h += '<ol style="font-family:var(--mono);font-size:.82rem;line-height:2;">';
-      existing.forEach(function(g) { h += '<li>' + escH(fmtName(g)) + '</li>'; });
+      existing.forEach(function(g) { h += '<li>' + fmtName(g) + '</li>'; });
       h += '</ol>';
     } else {
       h += '<div class="empty"><div class="empty-icon">🏌️</div>No picks submitted for this week.</div>';
@@ -3183,8 +3250,8 @@ function checkPickUsage() {
     seen[g] = (seen[g]||0)+1;
     if (seen[g] > 1) { warnings.push('"' + g + '" entered more than once this week'); return; }
     const pastUses = myUsageNorm[g] || 0;
-    if (pastUses >= state.settings.maxUses) warnings.push(fmtName(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
-    else if (pastUses === state.settings.maxUses - 1) warnings.push(fmtName(g) + ' — this would be your last allowed use');
+    if (pastUses >= state.settings.maxUses) warnings.push(escH(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
+    else if (pastUses === state.settings.maxUses - 1) warnings.push(escH(g) + ' — this would be your last allowed use');
   });
 
   // Refresh per-input usage badges
@@ -3340,6 +3407,73 @@ function toast(msg, type = 'info') {
   el.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999;font-family:var(--mono);font-size:.76rem;padding:10px 15px;border-radius:6px;max-width:330px;background:'+bg+';border:1px solid '+bc+';color:#fff;display:block;';
   el.textContent = msg;
   clearTimeout(_tt); _tt = setTimeout(() => { el.style.display = 'none'; }, 3400);
+}
+
+// ═══ DATAGOLF API ═════════════════════════════════════════════════════════════════════════════
+
+// Cloud Function base URL — update this after first deploy
+// e.g. 'https://us-central1-golfhunks.cloudfunctions.net'
+const DG_FUNCTIONS_BASE = 'https://us-central1-golfhunks.cloudfunctions.net';
+
+// Fetch the shared secret from Firestore (stored at gfl/secret)
+// Called once after login; cached in memory for the session
+let _dgSecret = null;
+async function getDgSecret() {
+  if (_dgSecret) return _dgSecret;
+  try {
+    const snap = await window._fsGetDoc(
+      window._fsDoc(window._db, 'gfl', 'secret')
+    );
+    if (snap.exists()) { _dgSecret = snap.data().value; return _dgSecret; }
+  } catch(e) { console.error('getDgSecret error:', e); }
+  return null;
+}
+
+async function dgCall(endpoint, body) {
+  const secret = await getDgSecret();
+  if (!secret) { toast('App secret not configured — see setup instructions', 'error'); return null; }
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--gold);">⏳ Fetching from DataGolf…</span>';
+  try {
+    const resp = await fetch(DG_FUNCTIONS_BASE + '/' + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-app-secret': secret },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.statusText);
+    return data;
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:#e07070;">❌ Error: ' + escH(e.message) + '</span>';
+    toast('DataGolf fetch failed: ' + e.message, 'error');
+    return null;
+  }
+}
+
+async function dgFetchField() {
+  const result = await dgCall('fetchField', { tour: 'pga' });
+  if (!result) return;
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:#5dcc7a;">✓ Field loaded — ' + result.players + ' players' + (result.tournName ? ' · ' + escH(result.tournName) : '') + '</span>';
+  toast('Field loaded from DataGolf — ' + result.players + ' players', 'success');
+}
+
+async function dgFetchScores() {
+  const tournName = (document.getElementById('dgTournName')?.value || '').trim();
+  const isMajor   = document.getElementById('dgIsMajor')?.checked || false;
+  const result = await dgCall('fetchScores', { tournName, isMajor, tour: 'pga' });
+  if (!result) return;
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:#5dcc7a;">✓ Scores loaded — ' + result.players + ' players · Round: ' + escH(result.round || 'unknown') + '</span>';
+  toast('Scores loaded from DataGolf — ' + result.players + ' players', 'success');
+}
+
+async function dgFetchRankings() {
+  const result = await dgCall('fetchRankings', {});
+  if (!result) return;
+  const statusEl = document.getElementById('dgStatus');
+  if (statusEl) statusEl.innerHTML = '<span style="color:#5dcc7a;">✓ Rankings refreshed — ' + result.players + ' players</span>';
+  toast('Rankings refreshed from DataGolf — ' + result.players + ' players', 'success');
 }
 
 // ═══ INIT ═════════════════════════════════════════════════════════════════════
