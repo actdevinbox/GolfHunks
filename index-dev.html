@@ -1573,20 +1573,54 @@ function calcWeekResults(wk) {
 
   if (!results.length) return null;
 
-  // Determine best/worst with tie splitting
+  // ── Tiebreaker logic ──────────────────────────────────────────────────────
+  // In golf: LOWER score = BETTER.
+  // Best (lowest total) owes penalty. Worst (highest total) wins prize.
+  // Tiebreaker for best: compare sorted individual golfer scores low→high.
+  // Tiebreaker for worst: compare sorted individual golfer scores high→low.
+  // If completely identical picks/scores: split evenly.
+
+  function getSortedScores(result, ascending) {
+    // Returns competitor's individual golfer scores sorted asc (for best TB) or desc (for worst TB)
+    const scores = result.pickDetail.map(pd => pd.score !== null && pd.score !== undefined ? pd.score : 9999);
+    return ascending ? [...scores].sort((a,b) => a - b) : [...scores].sort((a,b) => b - a);
+  }
+
+  function breakTie(tied, ascending) {
+    // Returns array of winners (length 1 if resolved, >1 if truly identical)
+    if (tied.length === 1) return tied;
+    const maxLen = Math.max(...tied.map(r => r.pickDetail.length));
+    for (let i = 0; i < maxLen; i++) {
+      const sortedScores = tied.map(r => getSortedScores(r, ascending));
+      const vals = sortedScores.map(s => s[i] !== undefined ? s[i] : 9999);
+      const best = ascending ? Math.min(...vals) : Math.max(...vals);
+      const survivors = tied.filter((r, idx) => vals[idx] === best);
+      if (survivors.length < tied.length) return breakTie(survivors, ascending);
+    }
+    return tied; // truly identical
+  }
+
   const withScores = results.filter(r => r.total !== null);
   if (withScores.length > 1) {
     const scores = withScores.map(r => r.total);
     const bestScore  = Math.min(...scores);
     const worstScore = Math.max(...scores);
-    const bestCount  = scores.filter(s => s === bestScore).length;
-    const worstCount = scores.filter(s => s === worstScore).length;
-    // Split prize/penalty evenly across tied players, rounded to 2dp
-    const splitPrize   = Math.round((state.settings.highPrize  / bestCount)  * 100) / 100;
-    const splitPenalty = Math.round((state.settings.lowPenalty / worstCount) * 100) / 100;
+
+    const bestTied  = withScores.filter(r => r.total === bestScore);
+    const worstTied = withScores.filter(r => r.total === worstScore);
+
+    const bestWinners  = breakTie(bestTied,  true);   // ascending = lowest individual score wins
+    const worstWinners = breakTie(worstTied, false);  // descending = highest individual score loses
+
+    const splitPrize   = Math.round((state.settings.highPrize  / bestWinners.length)  * 100) / 100;
+    const splitPenalty = Math.round((state.settings.lowPenalty / worstWinners.length) * 100) / 100;
+
+    const bestIds  = new Set(bestWinners.map(r => r.player.id));
+    const worstIds = new Set(worstWinners.map(r => r.player.id));
+
     results.forEach(r => {
-      r.isBest  = r.total === bestScore;
-      r.isWorst = r.total === worstScore;
+      r.isBest  = bestIds.has(r.player.id);
+      r.isWorst = worstIds.has(r.player.id);
       r.splitPrize   = r.isBest  ? splitPrize   : 0;
       r.splitPenalty = r.isWorst ? splitPenalty : 0;
     });
@@ -2870,6 +2904,14 @@ function checkDeadlineAutoLock() {
     renderWeeklyFantasyScores();
     renderLiveStandings();
     toast('Pick deadline passed — self-entry closed automatically', 'warn');
+    // Auto-fetch live data from DataGolf after picks lock
+    // The scheduled function fires every 5 min, but we trigger immediately here too
+    if (typeof dgCall === 'function') {
+      toast('Fetching live scores from DataGolf…', 'info');
+      dgFetchField().then(function() { return dgFetchScores(); }).catch(function(e) {
+        console.warn('Auto-fetch after lock failed:', e);
+      });
+    }
   }
 }
 
@@ -3000,8 +3042,8 @@ function renderAuditLog() {
     const ts = new Date(e.ts).toLocaleString('en-US',{
       timeZone:'America/Chicago', month:'short', day:'numeric',
       hour:'numeric', minute:'2-digit'}) + ' CT';
-    const prev = (e.prev||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
-    const next = (e.next||[]).map(function(g){return fmtName(g);}).join(', ') || '(none)';
+    const prev = (e.prev||[]).map(function(g){return escH(g);}).join(', ') || '(none)';
+    const next = (e.next||[]).map(function(g){return escH(g);}).join(', ') || '(none)';
     const changed = JSON.stringify(e.prev||[]) !== JSON.stringify(e.next||[]);
     h += '<tr' + (changed ? '' : ' style="opacity:.5"') + '>' +
       '<td class="text-small" style="font-family:var(--mono);white-space:nowrap;">' + ts + '</td>' +
@@ -3094,7 +3136,7 @@ function renderPicksEntry() {
     let h = '<p class="text-small text-muted" style="margin-bottom:10px;">Your submitted picks for Week ' + wk + ':</p>';
     if (existing.length) {
       h += '<ol style="font-family:var(--mono);font-size:.82rem;line-height:2;">';
-      existing.forEach(function(g) { h += '<li>' + escH(fmtName(g)) + '</li>'; });
+      existing.forEach(function(g) { h += '<li>' + fmtName(g) + '</li>'; });
       h += '</ol>';
     } else {
       h += '<div class="empty"><div class="empty-icon">🏌️</div>No picks submitted for this week.</div>';
@@ -3208,8 +3250,8 @@ function checkPickUsage() {
     seen[g] = (seen[g]||0)+1;
     if (seen[g] > 1) { warnings.push('"' + g + '" entered more than once this week'); return; }
     const pastUses = myUsageNorm[g] || 0;
-    if (pastUses >= state.settings.maxUses) warnings.push(fmtName(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
-    else if (pastUses === state.settings.maxUses - 1) warnings.push(fmtName(g) + ' — this would be your last allowed use');
+    if (pastUses >= state.settings.maxUses) warnings.push(escH(g) + ' already used ' + pastUses + 'x (max ' + state.settings.maxUses + ')');
+    else if (pastUses === state.settings.maxUses - 1) warnings.push(escH(g) + ' — this would be your last allowed use');
   });
 
   // Refresh per-input usage badges
