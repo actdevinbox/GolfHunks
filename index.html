@@ -1612,8 +1612,10 @@ function calcWeekResults(wk) {
     const bestWinners  = breakTie(bestTied,  true);   // ascending = lowest individual score wins
     const worstWinners = breakTie(worstTied, false);  // descending = highest individual score loses
 
-    const splitPrize   = Math.round((state.settings.highPrize  / bestWinners.length)  * 100) / 100;
-    const splitPenalty = Math.round((state.settings.lowPenalty / worstWinners.length) * 100) / 100;
+    const isMajorWeek  = state.currentScores?.isMajor || false;
+    const effectivePrize = isMajorWeek ? state.settings.highPrize * 2 : state.settings.highPrize;
+    const splitPrize   = Math.round((effectivePrize             / bestWinners.length)  * 100) / 100;
+    const splitPenalty = Math.round((state.settings.lowPenalty  / worstWinners.length) * 100) / 100;
 
     const bestIds  = new Set(bestWinners.map(r => r.player.id));
     const worstIds = new Set(worstWinners.map(r => r.player.id));
@@ -1661,12 +1663,14 @@ function renderWeeklyFantasyScores() {
     const wfsMe = r.player.id === myPlayerId;
 
     let badge = '', money = '—';
+    const isMajorWeek = state.currentScores?.isMajor || false;
+    const prizeDisplay = isMajorWeek ? state.settings.highPrize * 2 : state.settings.highPrize;
     if (r.isBest) {
-      badge = '<span class="tag tag-green">BEST 🥇</span>';
-      money = '<span class="money-win">+$' + state.settings.highPrize + '</span>';
+      badge = '<span class="tag tag-green">BEST ' + (isMajorWeek ? '⭐🥇' : '🥇') + '</span>';
+      money = '<span class="money-win">+$' + (r.splitPrize || prizeDisplay) + (isMajorWeek ? ' <span class="tag tag-gold" style="font-size:.55rem">MAJOR</span>' : '') + '</span>';
     } else if (r.isWorst) {
       badge = '<span class="tag tag-red">WORST 💸</span>';
-      money = '<span class="money-owe">-$' + state.settings.lowPenalty + '</span>';
+      money = '<span class="money-owe">-$' + (r.splitPenalty || state.settings.lowPenalty) + '</span>';
     }
 
     let pickCell = '';
@@ -1804,7 +1808,8 @@ function renderLiveStandings() {
       const pd = playerData[r.playerId];
       pd.lockedTotal += (r.total || 0);
       pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, live: false };
-      if (r.isBest)  pd.balance += (r.splitPrize   || lw.settings.highPrize);
+      const _lwPrize = (lw.settings?.isMajor ? lw.settings.highPrize * 2 : lw.settings.highPrize);
+      if (r.isBest)  pd.balance += (r.splitPrize   || _lwPrize);
       if (r.isWorst) pd.balance -= (r.splitPenalty || lw.settings.lowPenalty);
     });
   });
@@ -1912,8 +1917,9 @@ function renderCumulativeStandings() {
       const pd = playerData[r.playerId];
       pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, rank: weekRanks[wk][r.playerId] };
       pd.total += (r.total || 0);
-      if (r.isBest)  { pd.balance += (r.splitPrize   || state.settings.highPrize);  pd.bestCount++; }
-      if (r.isWorst) { pd.balance -= (r.splitPenalty || state.settings.lowPenalty); pd.worstCount++; }
+      const _cumPrize = (lw.settings?.isMajor ? lw.settings.highPrize * 2 : (lw.settings?.highPrize || state.settings.highPrize));
+      if (r.isBest)  { pd.balance += (r.splitPrize   || _cumPrize);                    pd.bestCount++;  if (lw.settings?.isMajor) pd.majorWins = (pd.majorWins || 0) + 1; }
+      if (r.isWorst) { pd.balance -= (r.splitPenalty || lw.settings?.lowPenalty || state.settings.lowPenalty); pd.worstCount++; }
     });
   });
 
@@ -1927,6 +1933,7 @@ function renderCumulativeStandings() {
     r._weekWins   = st.weekWins   || 0;
     r._champPicks = st.winPicks   || 0;
     r._madeCutPct = st.madeCutPct || 0;
+    r._majorWins  = r.majorWins   || 0;
   });
   const cumSortFn = (a, b) => {
     let av, bv;
@@ -1935,6 +1942,7 @@ function renderCumulativeStandings() {
     else if (cumSort.col === 'weekWins') { av = a._weekWins;  bv = b._weekWins; }
     else if (cumSort.col === 'champPicks') { av = a._champPicks; bv = b._champPicks; }
     else if (cumSort.col === 'madeCutPct') { av = a._madeCutPct; bv = b._madeCutPct; }
+    else if (cumSort.col === 'majorWins') { av = a._majorWins || 0; bv = b._majorWins || 0; }
     else if (cumSort.col === 'name')         { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
     else if (cumSort.col.startsWith('wk_')) {
       const wkNum = parseInt(cumSort.col.slice(3));
@@ -1959,7 +1967,7 @@ function renderCumulativeStandings() {
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
     '<th>#</th>' + mks('Competitor','name','') +
     mks('Balance','balance') + mks('Total','total') +
-    mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct');
+    mks('🏆 Wins','weekWins') + mks('⭐ Majors','majorWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct');
   wksDesc.forEach(wk => {
     const lw = state.lockedWeeks[wk];
     const short = escH(lw.tournName).slice(0,14);
@@ -1990,13 +1998,15 @@ function renderCumulativeStandings() {
     const cSt = pStats2[r._id];
     const fmtStat = v => v === 0 ? '0' : Number.isInteger(v) ? v : v.toFixed(1);
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.weekWins) : '—') + '</td>';
+    h += '<td class="r text-small" style="font-family:var(--mono);color:var(--gold)">' + (r._majorWins > 0 ? '⭐' + r._majorWins : '—') + '</td>';
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.winPicks) : '—') + '</td>';
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt && cSt.madeCutPct !== null ? cSt.madeCutPct + '%' : '—') + '</td>';
 
     wksDesc.forEach(wk => {
       const wd = r.weeks[wk];
       if (!wd) { h += '<td class="r text-muted hide-md">—</td>'; return; }
-      const badge = wd.isBest ? ' 🥇' : wd.isWorst ? ' 💸' : '';
+      const lwIsMaj = state.lockedWeeks[wk]?.settings?.isMajor || false;
+      const badge = wd.isBest ? (lwIsMaj ? ' ⭐🥇' : ' 🥇') : wd.isWorst ? ' 💸' : '';
       const rankStr = wd.rank ? ' <em style="font-size:.62rem;opacity:.7;font-style:italic;">(' + wd.rank + ')</em>' : '';
       h += '<td class="r hide-md ' + scoreClass(wd.total) + '" style="font-family:var(--mono);font-size:.72rem">' +
         fmtScore(wd.total) + rankStr + badge + '</td>';
@@ -2095,8 +2105,10 @@ function showWeekHistory(wk) {
 
   sorted.forEach((r, i) => {
     let badge = '', money = '—';
-    if (r.isBest)  { badge = '<span class="tag tag-green">BEST 🥇</span>';  money = '<span class="money-win">+$' + lw.settings.highPrize + '</span>'; }
-    if (r.isWorst) { badge = '<span class="tag tag-red">WORST 💸</span>';   money = '<span class="money-owe">-$' + lw.settings.lowPenalty + '</span>'; }
+    const lwIsMajor = lw.settings?.isMajor || false;
+    const lwPrize = lwIsMajor ? lw.settings.highPrize * 2 : lw.settings.highPrize;
+    if (r.isBest)  { badge = '<span class="tag tag-green">BEST ' + (lwIsMajor ? '⭐🥇' : '🥇') + '</span>';  money = '<span class="money-win">+$' + (r.splitPrize || lwPrize) + (lwIsMajor ? ' <span class="tag tag-gold" style="font-size:.55rem">MAJOR</span>' : '') + '</span>'; }
+    if (r.isWorst) { badge = '<span class="tag tag-red">WORST 💸</span>';   money = '<span class="money-owe">-$' + (r.splitPenalty || lw.settings.lowPenalty) + '</span>'; }
 
     const pickDisplay = (r.pickDetail || r.picks.map(p => ({name:p, score:null}))).map(pd => {
       const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.5rem">MC</span>' : '';
@@ -2384,7 +2396,7 @@ function lockCurrentWeek() {
     tournWinners: tournWinners,
     lockedAt: new Date().toLocaleString(),
     mcScore,
-    settings: { lowPenalty: state.settings.lowPenalty, highPrize: state.settings.highPrize },
+    settings: { lowPenalty: state.settings.lowPenalty, highPrize: state.settings.highPrize, isMajor: state.currentScores.isMajor || false },
     results: results.map(r => ({
       playerId: r.player.id,
       playerName: r.player.name,
