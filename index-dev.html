@@ -84,6 +84,11 @@
     font-size:.68rem;padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:.05em;transition:all .15s;white-space:nowrap;}
   .btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
 
+  .collapsible-header{cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+  .collapsible-header .collapse-icon{font-size:.75rem;color:var(--text-muted);transition:transform .2s;}
+  .collapsible-header.open .collapse-icon{transform:rotate(180deg);}
+  .collapsible-body{display:none;padding-top:12px;}
+  .collapsible-body.open{display:block;}
   .file-upload-area{border:2px dashed var(--card-border);border-radius:6px;padding:18px;text-align:center;
     cursor:pointer;transition:border-color .15s;font-family:var(--mono);font-size:.76rem;color:var(--text-muted);}
   .file-upload-area:hover,.file-upload-area.drag-over{border-color:var(--gold);color:var(--gold);}
@@ -324,7 +329,7 @@
   <div class="tournament-banner" id="tournBanner">
     <div>
       <div class="tournament-name" id="tournName">No scores loaded</div>
-      <div class="tournament-sub" id="tournSub">Upload scores &amp; picks CSVs in the Admin tab</div>
+      <div class="tournament-sub" id="tournSub">Fetch Field in Admin to load the current week</div>
     </div>
     <span class="status-pill status-none" id="tournStatus">No Data</span>
   </div>
@@ -413,11 +418,10 @@
       <div id="liveStandingsBody" style="display:none;">
         <div style="font-family:var(--mono);font-size:.68rem;color:var(--text-muted);margin-bottom:10px;padding:6px 10px;
           background:rgba(0,0,0,.2);border-radius:4px;border-left:3px solid var(--gold);">
-          Locked weeks + current live week combined. <em>Not final until locked.</em>
-          &nbsp;·&nbsp;🏆 best (lowest) wins $<span id="liveRulesPrize">—</span>
-          &nbsp;·&nbsp;💸 worst (highest) owes $<span id="liveRulesPenalty">—</span>
+          Live + locked weeks combined — <em>not final until locked.</em>
+          &nbsp;·&nbsp;🥇 +$<span id="liveRulesPrize">—</span> &nbsp;·&nbsp;💸 −$<span id="liveRulesPenalty">—</span>
         </div>
-        <div id="live-standings"><div class="empty"><div class="empty-icon">📡</div>Load scores &amp; picks to see live standings.</div></div>
+        <div id="live-standings"><div class="empty"><div class="empty-icon">📡</div>Fetch scores and load picks to see live standings.</div></div>
       </div>
     </div>
 
@@ -453,7 +457,7 @@
         </div>
       </div>
       <div class="alert alert-info" id="fieldUploadHint">
-        Upload a field file in <strong>Admin → Upload Field File</strong>.
+        Use <strong>Fetch Field</strong> in the Admin tab to load this week's players.
       </div>
       <div class="flex" style="margin-bottom:13px;">
         <input type="text" id="fieldSearch" placeholder="Search player..." oninput="renderFieldTable()" style="max-width:260px;" />
@@ -490,10 +494,14 @@
       <div id="dgStatus" style="margin-top:12px;font-family:var(--mono);font-size:.74rem;"></div>
     </div>
 
-    <!-- Picks CSV upload (fix #5) -->
+    <!-- Picks CSV upload -->
     <div class="card">
-      <div class="card-title">Upload Picks CSV</div>
-      <p class="text-small text-muted" style="margin-bottom:11px;">
+      <div class="card-title collapsible-header" onclick="toggleCollapse('picksCSVBody',this)">
+        <span>Picks CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
+        <span class="collapse-icon">▼</span>
+      </div>
+      <div class="collapsible-body" id="picksCSVBody">
+      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
         Columns: <code>Competitor, tournament, Golfer1, Golfer2, Golfer3, Golfer4, Golfer5</code><br>
         <code>Competitor</code> = league player name. <code>tournament</code> = week label (e.g. <em>The Masters</em>).<br>
         Competitors are auto-created if new. All rows sharing the same <code>tournament</code> are loaded as the current week's picks.
@@ -518,12 +526,17 @@
         <button class="btn" onclick="loadPicks()">Load Picks</button>
         <button class="btn-ghost" onclick="clearPicks()">Clear This Week's Picks</button>
       </div>
+      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Score CSV upload -->
     <div class="card">
-      <div class="card-title">Upload Tournament Scores CSV</div>
-      <p class="text-small text-muted" style="margin-bottom:11px;">
+      <div class="card-title collapsible-header" onclick="toggleCollapse('scoresCSVBody',this)">
+        <span>Scores CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
+        <span class="collapse-icon">▼</span>
+      </div>
+      <div class="collapsible-body" id="scoresCSVBody">
+      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
         Required: <code>player_name</code>, <code>score</code><br>
         Full set: <code>position, player_name, course, score, thru, today, sg_putt, sg_arg, sg_app, sg_ott, sg_t2g, sg_total</code><br>
         Position: <code>T8</code> = tied, <code>3</code> = solo, <code>CUT</code>/<code>WD</code>/<code>DQ</code> = missed cut. Name: <code>Last, First</code>
@@ -566,12 +579,17 @@
         <button class="btn" onclick="loadScores()">Load Scores</button>
         <button class="btn-ghost" onclick="clearScores()">Clear Scores</button>
       </div>
+      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Full OWGR Rankings upload -->
     <div class="card">
-      <div class="card-title">Upload Full OWGR Rankings</div>
-      <p class="text-small text-muted" style="margin-bottom:11px;">
+      <div class="card-title collapsible-header" onclick="toggleCollapse('owgrCSVBody',this)">
+        <span>OWGR Rankings CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
+        <span class="collapse-icon">▼</span>
+      </div>
+      <div class="collapsible-body" id="owgrCSVBody">
+      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
         Full season-long rankings used for the <strong>All Players</strong> view on the Players tab.
         Accepts <code>owgr_rank,player_name</code> CSV. Load once per season or whenever rankings update.
       </p>
@@ -588,12 +606,17 @@
         <button class="btn" onclick="loadOwgrList()">Load OWGR</button>
         <button class="btn-ghost" onclick="clearOwgrList()">Clear</button>
       </div>
+      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Field / Player List upload -->
     <div class="card">
-      <div class="card-title">Upload Field File</div>
-      <p class="text-small text-muted" style="margin-bottom:11px;">
+      <div class="card-title collapsible-header" onclick="toggleCollapse('fieldCSVBody',this)">
+        <span>Field File CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
+        <span class="collapse-icon">▼</span>
+      </div>
+      <div class="collapsible-body" id="fieldCSVBody">
+      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
         Accepts the pipe-delimited field file (<code>event_name|player_name|owgr_rank|current_round…</code>)
         or the old OWGR CSV (<code>owgr_rank,player_name</code>). Automatically sets tournament name from <code>event_name</code>.
         Persists across sessions.
@@ -612,6 +635,7 @@
         <button class="btn" onclick="loadPlayerList()">Load Field</button>
         <button class="btn-ghost" onclick="clearPlayerList()">Clear</button>
       </div>
+      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Manage Competitors & PINs -->
@@ -705,7 +729,7 @@
           <option value="current">Current (Week <span id="lockWeekNum">1</span>)</option>
         </select>
       </div>
-      <div id="admin-week-scores"><div class="empty">Upload picks and scores CSVs to see results here.</div></div>
+      <div id="admin-week-scores"><div class="empty">Load picks and fetch scores to see results here.</div></div>
       <div class="mt-16">
         <button class="btn" onclick="lockCurrentWeek()">🔒 Lock Week <span id="lockWeekNum2">1</span></button>
       </div>
@@ -1272,7 +1296,7 @@ function updateBanner() {
     s.textContent = state.currentRound ? state.currentRound : '✓ Loaded'; s.className = 'status-pill status-loaded';
   } else {
     document.getElementById('tournName').textContent = state.currentTournName || 'No scores loaded';
-    document.getElementById('tournSub').textContent = 'Upload a scores CSV in the Admin tab';
+    document.getElementById('tournSub').textContent = state.playerList.length ? state.playerList.length + ' players in field · Fetch Scores in Admin to go live' : 'Fetch Field in Admin to load the current week';
     const s = document.getElementById('tournStatus');
     s.textContent = 'No Data'; s.className = 'status-pill status-none';
   }
@@ -1371,7 +1395,7 @@ function toggleLeaderboardExpand() {
 function renderLeaderboardTable() {
   const el = document.getElementById('pga-leaderboard');
   if (!state.currentScores) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📄</div>No scores loaded — upload a CSV in the Admin tab.</div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📄</div>No scores loaded — use Fetch Scores in the Admin tab.</div>';
     return;
   }
 
@@ -1573,54 +1597,20 @@ function calcWeekResults(wk) {
 
   if (!results.length) return null;
 
-  // ── Tiebreaker logic ──────────────────────────────────────────────────────
-  // In golf: LOWER score = BETTER.
-  // Best (lowest total) owes penalty. Worst (highest total) wins prize.
-  // Tiebreaker for best: compare sorted individual golfer scores low→high.
-  // Tiebreaker for worst: compare sorted individual golfer scores high→low.
-  // If completely identical picks/scores: split evenly.
-
-  function getSortedScores(result, ascending) {
-    const scores = result.pickDetail.map(pd => pd.score !== null && pd.score !== undefined ? pd.score : 9999);
-    return ascending ? [...scores].sort((a,b) => a - b) : [...scores].sort((a,b) => b - a);
-  }
-
-  function breakTie(tied, ascending) {
-    if (tied.length === 1) return tied;
-    const maxLen = Math.max(...tied.map(r => r.pickDetail.length));
-    for (let i = 0; i < maxLen; i++) {
-      const sortedScores = tied.map(r => getSortedScores(r, ascending));
-      const vals = sortedScores.map(s => s[i] !== undefined ? s[i] : 9999);
-      const best = ascending ? Math.min(...vals) : Math.max(...vals);
-      const survivors = tied.filter((r, idx) => vals[idx] === best);
-      if (survivors.length < tied.length) return breakTie(survivors, ascending);
-    }
-    return tied;
-  }
-
+  // Determine best/worst with tie splitting
   const withScores = results.filter(r => r.total !== null);
   if (withScores.length > 1) {
     const scores = withScores.map(r => r.total);
     const bestScore  = Math.min(...scores);
     const worstScore = Math.max(...scores);
-
-    const bestTied  = withScores.filter(r => r.total === bestScore);
-    const worstTied = withScores.filter(r => r.total === worstScore);
-
-    const bestWinners  = breakTie(bestTied,  true);
-    const worstWinners = breakTie(worstTied, false);
-
-    const isMajorWeek  = state.currentScores?.isMajor || false;
-    const effectivePrize = isMajorWeek ? state.settings.highPrize * 2 : state.settings.highPrize;
-    const splitPrize   = Math.round((effectivePrize             / bestWinners.length)  * 100) / 100;
-    const splitPenalty = Math.round((state.settings.lowPenalty  / worstWinners.length) * 100) / 100;
-
-    const bestIds  = new Set(bestWinners.map(r => r.player.id));
-    const worstIds = new Set(worstWinners.map(r => r.player.id));
-
+    const bestCount  = scores.filter(s => s === bestScore).length;
+    const worstCount = scores.filter(s => s === worstScore).length;
+    // Split prize/penalty evenly across tied players, rounded to 2dp
+    const splitPrize   = Math.round((state.settings.highPrize  / bestCount)  * 100) / 100;
+    const splitPenalty = Math.round((state.settings.lowPenalty / worstCount) * 100) / 100;
     results.forEach(r => {
-      r.isBest  = bestIds.has(r.player.id);
-      r.isWorst = worstIds.has(r.player.id);
+      r.isBest  = r.total === bestScore;
+      r.isWorst = r.total === worstScore;
       r.splitPrize   = r.isBest  ? splitPrize   : 0;
       r.splitPenalty = r.isWorst ? splitPenalty : 0;
     });
@@ -1661,14 +1651,12 @@ function renderWeeklyFantasyScores() {
     const wfsMe = r.player.id === myPlayerId;
 
     let badge = '', money = '—';
-    const isMajorWeek = state.currentScores?.isMajor || false;
-    const prizeDisplay = isMajorWeek ? state.settings.highPrize * 2 : state.settings.highPrize;
     if (r.isBest) {
-      badge = '<span class="tag tag-green">BEST ' + (isMajorWeek ? '⭐🥇' : '🥇') + '</span>';
-      money = '<span class="money-win">+$' + (r.splitPrize || prizeDisplay) + (isMajorWeek ? ' <span class="tag tag-gold" style="font-size:.55rem">MAJOR</span>' : '') + '</span>';
+      badge = '<span class="tag tag-green">BEST 🥇</span>';
+      money = '<span class="money-win">+$' + state.settings.highPrize + '</span>';
     } else if (r.isWorst) {
       badge = '<span class="tag tag-red">WORST 💸</span>';
-      money = '<span class="money-owe">-$' + (r.splitPenalty || state.settings.lowPenalty) + '</span>';
+      money = '<span class="money-owe">-$' + state.settings.lowPenalty + '</span>';
     }
 
     let pickCell = '';
@@ -1806,8 +1794,7 @@ function renderLiveStandings() {
       const pd = playerData[r.playerId];
       pd.lockedTotal += (r.total || 0);
       pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, live: false };
-      const _lwPrize = (lw.settings?.isMajor ? lw.settings.highPrize * 2 : lw.settings.highPrize);
-      if (r.isBest)  pd.balance += (r.splitPrize   || _lwPrize);
+      if (r.isBest)  pd.balance += (r.splitPrize   || lw.settings.highPrize);
       if (r.isWorst) pd.balance -= (r.splitPenalty || lw.settings.lowPenalty);
     });
   });
@@ -1915,9 +1902,8 @@ function renderCumulativeStandings() {
       const pd = playerData[r.playerId];
       pd.weeks[wk] = { total: r.total, isBest: r.isBest, isWorst: r.isWorst, rank: weekRanks[wk][r.playerId] };
       pd.total += (r.total || 0);
-      const _cumPrize = (lw.settings?.isMajor ? lw.settings.highPrize * 2 : (lw.settings?.highPrize || state.settings.highPrize));
-      if (r.isBest)  { pd.balance += (r.splitPrize   || _cumPrize);                    pd.bestCount++;  if (lw.settings?.isMajor) pd.majorWins = (pd.majorWins || 0) + 1; }
-      if (r.isWorst) { pd.balance -= (r.splitPenalty || lw.settings?.lowPenalty || state.settings.lowPenalty); pd.worstCount++; }
+      if (r.isBest)  { pd.balance += (r.splitPrize   || state.settings.highPrize);  pd.bestCount++; }
+      if (r.isWorst) { pd.balance -= (r.splitPenalty || state.settings.lowPenalty); pd.worstCount++; }
     });
   });
 
@@ -1931,7 +1917,6 @@ function renderCumulativeStandings() {
     r._weekWins   = st.weekWins   || 0;
     r._champPicks = st.winPicks   || 0;
     r._madeCutPct = st.madeCutPct || 0;
-    r._majorWins  = r.majorWins   || 0;
   });
   const cumSortFn = (a, b) => {
     let av, bv;
@@ -1940,7 +1925,6 @@ function renderCumulativeStandings() {
     else if (cumSort.col === 'weekWins') { av = a._weekWins;  bv = b._weekWins; }
     else if (cumSort.col === 'champPicks') { av = a._champPicks; bv = b._champPicks; }
     else if (cumSort.col === 'madeCutPct') { av = a._madeCutPct; bv = b._madeCutPct; }
-    else if (cumSort.col === 'majorWins') { av = a._majorWins || 0; bv = b._majorWins || 0; }
     else if (cumSort.col === 'name')         { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
     else if (cumSort.col.startsWith('wk_')) {
       const wkNum = parseInt(cumSort.col.slice(3));
@@ -1965,7 +1949,7 @@ function renderCumulativeStandings() {
   let h = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>' +
     '<th>#</th>' + mks('Competitor','name','') +
     mks('Balance','balance') + mks('Total','total') +
-    mks('🏆 Wins','weekWins') + mks('⭐ Majors','majorWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct');
+    mks('🏆 Wins','weekWins') + mks('🎯 Champ','champPicks') + mks('MC%','madeCutPct');
   wksDesc.forEach(wk => {
     const lw = state.lockedWeeks[wk];
     const short = escH(lw.tournName).slice(0,14);
@@ -1996,15 +1980,13 @@ function renderCumulativeStandings() {
     const cSt = pStats2[r._id];
     const fmtStat = v => v === 0 ? '0' : Number.isInteger(v) ? v : v.toFixed(1);
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.weekWins) : '—') + '</td>';
-    h += '<td class="r text-small" style="font-family:var(--mono);color:var(--gold)">' + (r._majorWins > 0 ? '⭐' + r._majorWins : '—') + '</td>';
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt ? fmtStat(cSt.winPicks) : '—') + '</td>';
     h += '<td class="r text-small" style="font-family:var(--mono)">' + (cSt && cSt.madeCutPct !== null ? cSt.madeCutPct + '%' : '—') + '</td>';
 
     wksDesc.forEach(wk => {
       const wd = r.weeks[wk];
       if (!wd) { h += '<td class="r text-muted hide-md">—</td>'; return; }
-      const lwIsMaj = state.lockedWeeks[wk]?.settings?.isMajor || false;
-      const badge = wd.isBest ? (lwIsMaj ? ' ⭐🥇' : ' 🥇') : wd.isWorst ? ' 💸' : '';
+      const badge = wd.isBest ? ' 🥇' : wd.isWorst ? ' 💸' : '';
       const rankStr = wd.rank ? ' <em style="font-size:.62rem;opacity:.7;font-style:italic;">(' + wd.rank + ')</em>' : '';
       h += '<td class="r hide-md ' + scoreClass(wd.total) + '" style="font-family:var(--mono);font-size:.72rem">' +
         fmtScore(wd.total) + rankStr + badge + '</td>';
@@ -2016,10 +1998,9 @@ function renderCumulativeStandings() {
 
   // Summary bar below
   h += '<div style="margin-top:14px;font-family:var(--mono);font-size:.7rem;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap;">' +
-    '<span>🥇 Best weekly score wins $' + state.settings.highPrize + '</span>' +
-    '<span>💸 Worst weekly score owes $' + state.settings.lowPenalty + '</span>' +
-    '<span>🏆 Wins = best weekly score (partial for ties) · 🎯 Champ = picked tournament champion</span>' +
-    '<span>' + lockedWks.length + ' week' + (lockedWks.length!==1?'s':'') + ' locked</span>' +
+    '<span>🥇 Best Weekly: +$' + state.settings.highPrize + '</span>' +
+    '<span>💸 Worst Weekly: −$' + state.settings.lowPenalty + '</span>' +
+    '<span>🏆 Wins · ⭐ Majors · 🎯 Champ · ' + lockedWks.length + ' wk' + (lockedWks.length!==1?'s':'') + ' locked</span>' +
     '</div>';
 
   el.innerHTML = h;
@@ -2031,8 +2012,9 @@ function renderMoneyTable() {
   const rows = [];
   Object.entries(state.lockedWeeks).forEach(([wk, lw]) => {
     lw.results.forEach(r => {
-      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🥇 Best score prize' + (r.splitPrize && r.splitPrize !== lw.settings.highPrize ? ' (split)' : ''), amt: (r.splitPrize || lw.settings.highPrize), tourn: lw.tournName });
-      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score penalty' + (r.splitPenalty && r.splitPenalty !== lw.settings.lowPenalty ? ' (split)' : ''), amt: -(r.splitPenalty || lw.settings.lowPenalty), tourn: lw.tournName });
+      const _mPrize = (lw.settings?.isMajor ? lw.settings.highPrize * 2 : lw.settings.highPrize);
+      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🥇 Best score' + (lw.settings?.isMajor ? ' ⭐ Major' : '') + (r.splitPrize && r.splitPrize !== _mPrize ? ' (tied)' : ''), amt: (r.splitPrize || _mPrize), tourn: lw.tournName });
+      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score' + (r.splitPenalty && r.splitPenalty !== lw.settings.lowPenalty ? ' (tied)' : ''), amt: -(r.splitPenalty || lw.settings.lowPenalty), tourn: lw.tournName });
     });
   });
   if (!rows.length) { el.innerHTML = '<div class="empty">No locked weeks yet.</div>'; return; }
@@ -2103,10 +2085,8 @@ function showWeekHistory(wk) {
 
   sorted.forEach((r, i) => {
     let badge = '', money = '—';
-    const lwIsMajor = lw.settings?.isMajor || false;
-    const lwPrize = lwIsMajor ? lw.settings.highPrize * 2 : lw.settings.highPrize;
-    if (r.isBest)  { badge = '<span class="tag tag-green">BEST ' + (lwIsMajor ? '⭐🥇' : '🥇') + '</span>';  money = '<span class="money-win">+$' + (r.splitPrize || lwPrize) + (lwIsMajor ? ' <span class="tag tag-gold" style="font-size:.55rem">MAJOR</span>' : '') + '</span>'; }
-    if (r.isWorst) { badge = '<span class="tag tag-red">WORST 💸</span>';   money = '<span class="money-owe">-$' + (r.splitPenalty || lw.settings.lowPenalty) + '</span>'; }
+    if (r.isBest)  { badge = '<span class="tag tag-green">BEST 🥇</span>';  money = '<span class="money-win">+$' + lw.settings.highPrize + '</span>'; }
+    if (r.isWorst) { badge = '<span class="tag tag-red">WORST 💸</span>';   money = '<span class="money-owe">-$' + lw.settings.lowPenalty + '</span>'; }
 
     const pickDisplay = (r.pickDetail || r.picks.map(p => ({name:p, score:null}))).map(pd => {
       const mc = pd.mc ? ' <span class="tag tag-red" style="font-size:.5rem">MC</span>' : '';
@@ -2394,7 +2374,7 @@ function lockCurrentWeek() {
     tournWinners: tournWinners,
     lockedAt: new Date().toLocaleString(),
     mcScore,
-    settings: { lowPenalty: state.settings.lowPenalty, highPrize: state.settings.highPrize, isMajor: state.currentScores.isMajor || false },
+    settings: { lowPenalty: state.settings.lowPenalty, highPrize: state.settings.highPrize },
     results: results.map(r => ({
       playerId: r.player.id,
       playerName: r.player.name,
@@ -3334,6 +3314,15 @@ function submitCompetitorPicks() {
     weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
   if (msgEl) msgEl.innerHTML = '<span style="color:#5dcc7a;">✓ Picks saved at ' + ts + ' CT</span>';
   toast('Picks submitted!', 'success');
+}
+
+// ═══ COLLAPSIBLE SECTIONS ═══════════════════════════════════════════════════════════════════════════
+function toggleCollapse(bodyId, headerEl) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (headerEl) headerEl.classList.toggle('open', !isOpen);
 }
 
 // ═══ NAVIGATION ═══════════════════════════════════════════════════════════════
