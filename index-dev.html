@@ -84,11 +84,6 @@
     font-size:.68rem;padding:4px 10px;border-radius:4px;cursor:pointer;letter-spacing:.05em;transition:all .15s;white-space:nowrap;}
   .btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
 
-  .collapsible-header{cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
-  .collapsible-header .collapse-icon{font-size:.75rem;color:var(--text-muted);transition:transform .2s;}
-  .collapsible-header.open .collapse-icon{transform:rotate(180deg);}
-  .collapsible-body{display:none;padding-top:12px;}
-  .collapsible-body.open{display:block;}
   .file-upload-area{border:2px dashed var(--card-border);border-radius:6px;padding:18px;text-align:center;
     cursor:pointer;transition:border-color .15s;font-family:var(--mono);font-size:.76rem;color:var(--text-muted);}
   .file-upload-area:hover,.file-upload-area.drag-over{border-color:var(--gold);color:var(--gold);}
@@ -328,27 +323,22 @@
   <!-- BANNER -->
   <div class="tournament-banner" id="tournBanner">
     <div>
-      <div class="tournament-name" id="tournName">No scores loaded</div>
-      <div class="tournament-sub" id="tournSub">Fetch Field in Admin to load the current week</div>
+      <div class="tournament-name" id="tournName">—</div>
+      <div class="tournament-sub" id="tournSub">Season in progress</div>
     </div>
     <span class="status-pill status-none" id="tournStatus">No Data</span>
   </div>
 
   <!-- ══ LEADERBOARD TAB ══ -->
   <div id="tab-leaderboard" style="display:none;">
-    <div class="grid-2" style="margin-bottom:16px;">
-      <div class="card stat-card"><div class="stat-num" id="statPlayers">0</div><div class="stat-label">Competitors</div></div>
-      <div class="card stat-card"><div class="stat-num" id="statWeek">—</div><div class="stat-label">Current Week</div></div>
-    </div>
-
-    <!-- Fantasy scores FIRST (fix #2) -->
+    <!-- Fantasy scores FIRST -->
     <div class="card">
       <div class="card-title">
         <span>This Week's Fantasy Scores</span>
         <span class="text-small text-muted" id="fantasyWeekLabel"></span>
       </div>
 
-      <div id="weekly-scores"><div class="empty"><div class="empty-icon">📋</div>Upload picks &amp; scores CSVs to see results.</div></div>
+      <div id="weekly-scores"><div class="empty"><div class="empty-icon">📋</div>Results will appear here once the tournament is underway.</div></div>
     </div>
 
     <!-- Leaderboard second, shrunk + scrollable -->
@@ -360,7 +350,7 @@
       <div class="flex" style="margin-bottom:10px;">
         <input type="text" id="lbSearch" placeholder="Search player…" oninput="renderLeaderboardTable()" style="max-width:240px;" />
       </div>
-      <div id="pga-leaderboard"><div class="empty"><div class="empty-icon">📄</div>No scores loaded — upload a CSV in the Admin tab.</div></div>
+      <div id="pga-leaderboard"><div class="empty"><div class="empty-icon">📄</div>Leaderboard will appear once the tournament is underway.</div></div>
     </div>
   </div>
 
@@ -418,10 +408,11 @@
       <div id="liveStandingsBody" style="display:none;">
         <div style="font-family:var(--mono);font-size:.68rem;color:var(--text-muted);margin-bottom:10px;padding:6px 10px;
           background:rgba(0,0,0,.2);border-radius:4px;border-left:3px solid var(--gold);">
-          Live + locked weeks combined — <em>not final until locked.</em>
-          &nbsp;·&nbsp;🥇 +$<span id="liveRulesPrize">—</span> &nbsp;·&nbsp;💸 −$<span id="liveRulesPenalty">—</span>
+          Locked weeks + current live week combined. <em>Not final until locked.</em>
+          &nbsp;·&nbsp;🏆 best (lowest) wins $<span id="liveRulesPrize">—</span>
+          &nbsp;·&nbsp;💸 worst (highest) owes $<span id="liveRulesPenalty">—</span>
         </div>
-        <div id="live-standings"><div class="empty"><div class="empty-icon">📡</div>Fetch scores and load picks to see live standings.</div></div>
+        <div id="live-standings"><div class="empty"><div class="empty-icon">📡</div>Load scores &amp; picks to see live standings.</div></div>
       </div>
     </div>
 
@@ -457,7 +448,7 @@
         </div>
       </div>
       <div class="alert alert-info" id="fieldUploadHint">
-        Use <strong>Fetch Field</strong> in the Admin tab to load this week's players.
+        Player list not yet loaded for this week.
       </div>
       <div class="flex" style="margin-bottom:13px;">
         <input type="text" id="fieldSearch" placeholder="Search player..." oninput="renderFieldTable()" style="max-width:260px;" />
@@ -494,14 +485,10 @@
       <div id="dgStatus" style="margin-top:12px;font-family:var(--mono);font-size:.74rem;"></div>
     </div>
 
-    <!-- Picks CSV upload -->
+    <!-- Picks CSV upload (fix #5) -->
     <div class="card">
-      <div class="card-title collapsible-header" onclick="toggleCollapse('picksCSVBody',this)">
-        <span>Picks CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
-        <span class="collapse-icon">▼</span>
-      </div>
-      <div class="collapsible-body" id="picksCSVBody">
-      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
+      <div class="card-title">Upload Picks CSV</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
         Columns: <code>Competitor, tournament, Golfer1, Golfer2, Golfer3, Golfer4, Golfer5</code><br>
         <code>Competitor</code> = league player name. <code>tournament</code> = week label (e.g. <em>The Masters</em>).<br>
         Competitors are auto-created if new. All rows sharing the same <code>tournament</code> are loaded as the current week's picks.
@@ -526,17 +513,12 @@
         <button class="btn" onclick="loadPicks()">Load Picks</button>
         <button class="btn-ghost" onclick="clearPicks()">Clear This Week's Picks</button>
       </div>
-      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Score CSV upload -->
     <div class="card">
-      <div class="card-title collapsible-header" onclick="toggleCollapse('scoresCSVBody',this)">
-        <span>Scores CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
-        <span class="collapse-icon">▼</span>
-      </div>
-      <div class="collapsible-body" id="scoresCSVBody">
-      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
+      <div class="card-title">Upload Tournament Scores CSV</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
         Required: <code>player_name</code>, <code>score</code><br>
         Full set: <code>position, player_name, course, score, thru, today, sg_putt, sg_arg, sg_app, sg_ott, sg_t2g, sg_total</code><br>
         Position: <code>T8</code> = tied, <code>3</code> = solo, <code>CUT</code>/<code>WD</code>/<code>DQ</code> = missed cut. Name: <code>Last, First</code>
@@ -579,17 +561,12 @@
         <button class="btn" onclick="loadScores()">Load Scores</button>
         <button class="btn-ghost" onclick="clearScores()">Clear Scores</button>
       </div>
-      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Full OWGR Rankings upload -->
     <div class="card">
-      <div class="card-title collapsible-header" onclick="toggleCollapse('owgrCSVBody',this)">
-        <span>OWGR Rankings CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
-        <span class="collapse-icon">▼</span>
-      </div>
-      <div class="collapsible-body" id="owgrCSVBody">
-      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
+      <div class="card-title">Upload Full OWGR Rankings</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
         Full season-long rankings used for the <strong>All Players</strong> view on the Players tab.
         Accepts <code>owgr_rank,player_name</code> CSV. Load once per season or whenever rankings update.
       </p>
@@ -606,17 +583,12 @@
         <button class="btn" onclick="loadOwgrList()">Load OWGR</button>
         <button class="btn-ghost" onclick="clearOwgrList()">Clear</button>
       </div>
-      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Field / Player List upload -->
     <div class="card">
-      <div class="card-title collapsible-header" onclick="toggleCollapse('fieldCSVBody',this)">
-        <span>Field File CSV <span class="tag tag-blue" style="margin-left:6px;font-size:.55rem;">FALLBACK</span></span>
-        <span class="collapse-icon">▼</span>
-      </div>
-      <div class="collapsible-body" id="fieldCSVBody">
-      <p class="text-small text-muted" style="margin-bottom:11px;margin-top:8px;">
+      <div class="card-title">Upload Field File</div>
+      <p class="text-small text-muted" style="margin-bottom:11px;">
         Accepts the pipe-delimited field file (<code>event_name|player_name|owgr_rank|current_round…</code>)
         or the old OWGR CSV (<code>owgr_rank,player_name</code>). Automatically sets tournament name from <code>event_name</code>.
         Persists across sessions.
@@ -635,7 +607,6 @@
         <button class="btn" onclick="loadPlayerList()">Load Field</button>
         <button class="btn-ghost" onclick="clearPlayerList()">Clear</button>
       </div>
-      </div><!-- end collapsible-body -->
     </div>
 
     <!-- Manage Competitors & PINs -->
@@ -729,7 +700,7 @@
           <option value="current">Current (Week <span id="lockWeekNum">1</span>)</option>
         </select>
       </div>
-      <div id="admin-week-scores"><div class="empty">Load picks and fetch scores to see results here.</div></div>
+      <div id="admin-week-scores"><div class="empty">Upload picks and scores CSVs to see results here.</div></div>
       <div class="mt-16">
         <button class="btn" onclick="lockCurrentWeek()">🔒 Lock Week <span id="lockWeekNum2">1</span></button>
       </div>
@@ -1028,7 +999,7 @@ function loadPicks() {
         '</span><br><span style="font-size:.7rem;color:var(--text-muted);">These picks will still score — but they may be misspelled or not in this field. Check the Players tab.</span>' +
         '</div>';
       if (warnEl) { warnEl.innerHTML = warnHtml; warnEl.style.display = ''; }
-      toast('⚠ ' + missing.length + ' pick(s) not found in player list — see Admin for details', 'warn');
+      toast('⚠ ' + missing.length + ' pick(s) not found in player list — check spelling', 'warn');
       console.warn('Picks not in player list:', missing);
     } else {
       if (warnEl) { warnEl.innerHTML = ''; warnEl.style.display = 'none'; }
@@ -1281,22 +1252,26 @@ function updateBanner() {
   const cs = state.currentScores;
   const hasScores = !!cs;
 
-  // Hide banner and leaderboard when picks are open (self-entry phase) AND no scores loaded
-  const hideForSelfEntry = !hasScores && state.picksOpen;
-  const banner = document.getElementById('tournBanner');
+  // Always show banner — it displays pre-tournament info when picks are open
   const lbCard = document.getElementById('lbCard');
-  if (banner) banner.style.display = hideForSelfEntry ? 'none' : '';
-  if (lbCard) lbCard.style.display = hideForSelfEntry ? 'none' : '';
+  if (lbCard) lbCard.style.display = (!hasScores && state.picksOpen) ? 'none' : '';
 
   if (cs) {
     document.getElementById('tournName').textContent = cs.tournName + (cs.isMajor ? ' ⭐' : '');
     const roundLabel = state.currentRound ? ' · ' + state.currentRound : '';
-    document.getElementById('tournSub').textContent = cs.rows.length + ' players · Loaded ' + cs.loadedAt + roundLabel;
+    document.getElementById('tournSub').textContent = cs.rows.length + ' players · Updated ' + cs.loadedAt + roundLabel;
     const s = document.getElementById('tournStatus');
-    s.textContent = state.currentRound ? state.currentRound : '✓ Loaded'; s.className = 'status-pill status-loaded';
+    s.textContent = state.currentRound ? state.currentRound : '✓ Live'; s.className = 'status-pill status-loaded';
+  } else if (state.currentTournName) {
+    document.getElementById('tournName').textContent = state.currentTournName;
+    const fieldCount = state.playerList.length ? state.playerList.length + ' players' : '';
+    const preStatus = state.picksOpen ? 'Pre-Tournament · Picks open' : picksAreLocked() ? 'Pre-Tournament · Picks locked' : 'Pre-Tournament';
+    document.getElementById('tournSub').textContent = fieldCount ? fieldCount + ' · ' + preStatus : preStatus;
+    const s = document.getElementById('tournStatus');
+    s.textContent = 'Pre-Tourn'; s.className = 'status-pill status-loaded';
   } else {
-    document.getElementById('tournName').textContent = state.currentTournName || 'No scores loaded';
-    document.getElementById('tournSub').textContent = state.playerList.length ? state.playerList.length + ' players in field · Fetch Scores in Admin to go live' : 'Fetch Field in Admin to load the current week';
+    document.getElementById('tournName').textContent = 'Week ' + state.currentWeek;
+    document.getElementById('tournSub').textContent = state.playerList.length ? state.playerList.length + ' players in field' : 'Season in progress';
     const s = document.getElementById('tournStatus');
     s.textContent = 'No Data'; s.className = 'status-pill status-none';
   }
@@ -1395,7 +1370,7 @@ function toggleLeaderboardExpand() {
 function renderLeaderboardTable() {
   const el = document.getElementById('pga-leaderboard');
   if (!state.currentScores) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📄</div>No scores loaded — use Fetch Scores in the Admin tab.</div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📄</div>Leaderboard will appear once the tournament is underway.</div>';
     return;
   }
 
@@ -1623,7 +1598,14 @@ function renderWeeklyFantasyScores() {
   const el = document.getElementById('weekly-scores');
   const results = calcWeekResults(state.currentWeek);
   if (!results) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Upload picks &amp; scores CSVs to see results.</div>';
+    const _preTourn = state.picksOpen && !state.currentScores;
+    const _picksLocked = picksAreLocked() && !state.currentScores;
+    const _emptyMsg = _preTourn
+      ? 'Pre-Tournament — picks are open. Results will appear once play begins.'
+      : _picksLocked
+        ? 'Picks are locked — awaiting live scores.'
+        : 'Results will appear here once the tournament is underway.';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>' + _emptyMsg + '</div>';
     return;
   }
 
@@ -1998,9 +1980,10 @@ function renderCumulativeStandings() {
 
   // Summary bar below
   h += '<div style="margin-top:14px;font-family:var(--mono);font-size:.7rem;color:var(--text-muted);display:flex;gap:20px;flex-wrap:wrap;">' +
-    '<span>🥇 Best Weekly: +$' + state.settings.highPrize + '</span>' +
-    '<span>💸 Worst Weekly: −$' + state.settings.lowPenalty + '</span>' +
-    '<span>🏆 Wins · ⭐ Majors · 🎯 Champ · ' + lockedWks.length + ' wk' + (lockedWks.length!==1?'s':'') + ' locked</span>' +
+    '<span>🥇 Best weekly score wins $' + state.settings.highPrize + '</span>' +
+    '<span>💸 Worst weekly score owes $' + state.settings.lowPenalty + '</span>' +
+    '<span>🏆 Wins = best weekly score (partial for ties) · 🎯 Champ = picked tournament champion</span>' +
+    '<span>' + lockedWks.length + ' week' + (lockedWks.length!==1?'s':'') + ' locked</span>' +
     '</div>';
 
   el.innerHTML = h;
@@ -2012,9 +1995,8 @@ function renderMoneyTable() {
   const rows = [];
   Object.entries(state.lockedWeeks).forEach(([wk, lw]) => {
     lw.results.forEach(r => {
-      const _mPrize = (lw.settings?.isMajor ? lw.settings.highPrize * 2 : lw.settings.highPrize);
-      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🥇 Best score' + (lw.settings?.isMajor ? ' ⭐ Major' : '') + (r.splitPrize && r.splitPrize !== _mPrize ? ' (tied)' : ''), amt: (r.splitPrize || _mPrize), tourn: lw.tournName });
-      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score' + (r.splitPenalty && r.splitPenalty !== lw.settings.lowPenalty ? ' (tied)' : ''), amt: -(r.splitPenalty || lw.settings.lowPenalty), tourn: lw.tournName });
+      if (r.isBest)  rows.push({ wk, name: r.playerName, desc: '🥇 Best score prize' + (r.splitPrize && r.splitPrize !== lw.settings.highPrize ? ' (split)' : ''), amt: (r.splitPrize || lw.settings.highPrize), tourn: lw.tournName });
+      if (r.isWorst) rows.push({ wk, name: r.playerName, desc: '💸 Worst score penalty' + (r.splitPenalty && r.splitPenalty !== lw.settings.lowPenalty ? ' (split)' : ''), amt: -(r.splitPenalty || lw.settings.lowPenalty), tourn: lw.tournName });
     });
   });
   if (!rows.length) { el.innerHTML = '<div class="empty">No locked weeks yet.</div>'; return; }
@@ -2809,7 +2791,7 @@ function siteLogin() {
   }
   const player = state.players.find(function(p) { return p.id === selId; });
   if (!player)      { err.textContent = 'Competitor not found.';          err.style.display=''; return; }
-  if (!player.pin)  { err.textContent = 'No PIN set — contact the admin.'; err.style.display=''; return; }
+  if (!player.pin)  { err.textContent = 'No PIN set — contact the league organizer.'; err.style.display=''; return; }
   if (pin !== player.pin) { err.textContent = 'Incorrect PIN.';           err.style.display=''; return; }
 
   _session = { id: player.id, name: player.name, isAdmin: false };
@@ -3054,7 +3036,7 @@ function competitorLogin() {
   if (!selId) { errEl.textContent = 'Please select your name.'; errEl.style.display=''; return; }
   const player = state.players.find(function(p) { return p.id === selId; });
   if (!player) { errEl.textContent = 'Competitor not found.'; errEl.style.display=''; return; }
-  if (!player.pin) { errEl.textContent = 'No PIN set for your account — contact the admin.'; errEl.style.display=''; return; }
+  if (!player.pin) { errEl.textContent = 'No PIN set for your account — contact the league organizer.'; errEl.style.display=''; return; }
   if (pin !== player.pin) { errEl.textContent = 'Incorrect PIN.'; errEl.style.display=''; return; }
 
   _loggedInPlayerId = selId;
@@ -3094,7 +3076,7 @@ function renderPicksEntry() {
   const dl = deadlineUtc();
   if (!state.picksOpen) {
     banner.style.borderLeftColor = '#e07070';
-    banner.innerHTML = '🔒 Pick submission is currently closed. Contact the admin.';
+    banner.innerHTML = '🔒 Pick submission is currently closed.';
   } else if (locked) {
     banner.style.borderLeftColor = '#e07070';
     banner.innerHTML = '🔒 Pick deadline has passed — ' + (dl ? fmtCT(dl) : '') + '. Your picks are locked.';
@@ -3316,15 +3298,6 @@ function submitCompetitorPicks() {
   toast('Picks submitted!', 'success');
 }
 
-// ═══ COLLAPSIBLE SECTIONS ═══════════════════════════════════════════════════════════════════════════
-function toggleCollapse(bodyId, headerEl) {
-  const body = document.getElementById(bodyId);
-  if (!body) return;
-  const isOpen = body.classList.contains('open');
-  body.classList.toggle('open', !isOpen);
-  if (headerEl) headerEl.classList.toggle('open', !isOpen);
-}
-
 // ═══ NAVIGATION ═══════════════════════════════════════════════════════════════
 function showTab(tab) {
   TABS.forEach(t => { document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none'; });
@@ -3348,8 +3321,7 @@ function showTab(tab) {
 
 function renderAll() {
   const s = state.settings;
-  document.getElementById('statPlayers').textContent  = state.players.length;
-  document.getElementById('statWeek').textContent     = 'Wk ' + state.currentWeek;
+  // stat cards removed — week/players shown in banner
 
 
 
